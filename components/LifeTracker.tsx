@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 type LifeTrackerProps = {
   color: {
@@ -6,12 +6,22 @@ type LifeTrackerProps = {
     text: string;
     active: string;
   };
+  reset: boolean;
+  active?: boolean;
 };
-const LifeTracker = ({ color }: LifeTrackerProps) => {
+const LifeTracker = ({ color, reset, active }: LifeTrackerProps) => {
   const [life, setLife] = useState(40);
+
+  useEffect(() => {
+    if (reset) setLife(40);
+  }, [reset]);
+
   return (
     <div
-      className={`${color.background} ${color.text} font-bold relative flex flex-col flex-1 rounded-md select-none overflow-hidden text-6xl`}
+      role={"button"}
+      className={`${active ? "animate-pulse" : ""} ${color.background} ${
+        color.text
+      } font-bold relative flex flex-col flex-1 rounded-md select-none overflow-hidden text-6xl`}
     >
       <button
         className={`flex flex-1 ${color.active}`}

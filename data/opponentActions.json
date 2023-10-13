@@ -1,143 +1,121 @@
 {
+  "default": {
+    "message": "No action.",
+    "cost": 0
+  },
   "actions": [
     {
       "message": "Destroy all non-land permanents.",
-      "turn": 3,
-      "weight": 0.1
+      "cost": 3,
+      "weight": 0.1,
+      "type": "sorcery"
     },
     {
       "message": "Destroy all creatures.",
-      "turn": 4,
-      "weight": 0.1
+      "cost": 4,
+      "weight": 0.1,
+      "type": "sorcery"
     },
     {
       "message": "Destroy single best creature (you choose, honor system).",
-      "turn": 2,
-      "weight": 0.1
+      "cost": 2,
+      "weight": 0.1,
+      "type": "instant"
     },
     {
       "message": "Destroy all artifacts.",
-      "turn": 4,
-      "weight": 0.1
+      "cost": 4,
+      "weight": 0.1,
+      "type": "sorcery"
     },
     {
       "message": "Destroy single best artifact (you choose, honor system).",
-      "turn": 1,
-      "weight": 0.1
+      "cost": 1,
+      "weight": 0.1,
+      "type": "instant"
     },
     {
       "message": "Destroy all enchantments.",
-      "turn": 2,
-      "weight": 0.1
+      "cost": 2,
+      "weight": 0.1,
+      "type": "sorcery"
     },
     {
       "message": "Destroy single best enchantment (you choose, honor system).",
-      "turn": 1,
-      "weight": 0.1
+      "cost": 1,
+      "weight": 0.1,
+      "type": "instant"
     },
     {
       "message": "Sacrifice highest power creature and take 2 damage.",
-      "turn": 2,
-      "weight": 0.1
+      "cost": 2,
+      "weight": 0.1,
+      "type": "instant"
     },
     {
       "message": "Destroy all lands.",
-      "turn": 4,
-      "weight": 0.1
+      "cost": 4,
+      "weight": 0.1,
+      "type": "sorcery"
     },
     {
       "message": "Destroy target land (you choose, honor system).",
-      "turn": 1,
-      "weight": 0.1
+      "cost": 1,
+      "weight": 0.1,
+      "type": "sorcery"
     },
     {
-      "message": "If you control four or more lands, destroy single best non-basic land (you choose, honor system)",
-      "turn": 4,
-      "weight": 0.1
-    },
-    {
-      "message": "return each commander to command zone.",
-      "turn": 3,
-      "weight": 0.2
-    },
-    {
-      "message": "Take 10 damage - Attacked by an unblockable 10/10, (may be prevented with a removal spell, fog, prevent damage, etc.)",
-        "turn": 7,
-      "weight": 0.2
-    },
-    {
-      "message": "1/1 creature attacks you, if you don't block it, take 1 damage.",
-      "turn": 1,
-      "weight": 1.0
-    },
-    {
-      "message": "2/2 creature attacks you, if you don't block it, take 2 damage.",
-      "turn": 2,
-      "weight": 1.0
-    },
-    {
-      "message": "3/3 creature attacks you, if you don't block it, take 3 damage.",
-      "turn": 3,
-      "weight": 1.0
-    },
-    {
-      "message": "4/4 creature attacks you, if you don't block it, take 4 damage.",
-      "turn": 4,
-      "weight": 1.0
-    },
-    {
-      "message": "5/5 creature attacks you, if you don't block it, take 5 damage.",
-      "turn": 5,
-      "weight": 1.0
-    },
-    {
-      "message": "6/6 creature attacks you, if you don't block it, take 6 damage.",
-      "turn": 6,
-      "weight": 1.0
-    },
-    {
-      "message": "7/7 creature attacks you, if you don't block it, take 7 damage.",
-      "turn": 7,
-      "weight": 1.0
-    },
-    {
-      "message": "8/8 creature attacks you, if you don't block it, take 8 damage.",
-      "turn": 8,
-      "weight": 1.0
+      "message": "Recast each commander to command zone.",
+      "cost": 3,
+      "weight": 0.2,
+      "type": "instant"
     },
     {
       "message": "Exile all graveyards.",
-      "turn": 3,
-      "weight": 0.01
+      "cost": 3,
+      "weight": 0.01,
+      "type": "sorcery"
+    },
+    {
+      "message": "Cast */# creature.",
+        "cost": 1,
+        "weight": 0.3,
+        "type": "creature"
     }
   ],
   "responses": {
     "attack": [
       {
         "message": "Opponent responds! Destroy target attacking creature.",
-        "turn": 1,
+        "cost": 1,
         "weight": 0.1
       },
       {
         "message": "Creature is blocked.",
-        "turn": 1,
+        "cost": 1,
         "weight": 0.3
       },
       {
-        "message": "Creature deals combat damage.",
-        "turn": 1,
+        "message": "No response.",
+        "cost": 1,
         "weight": 0.3
       }
     ],
     "cast": [
       {
         "message": "Spell resolves.",
-        "turn": 1,
+        "cost": 1,
         "weight": 0.95
       },
       {
-        "message": "Spell is countered",
-        "turn": 1,
+        "message": "Spell is countered.",
+        "cost": 1,
+        "weight": 0.1
+      },
+      {
+        "message": "Spell is countered, unless you pay *.",
+        "range": [1,2,3],
+        "cost": 1,
         "weight": 0.1
       }
     ]
