@@ -6,7 +6,7 @@ type LifeTrackerProps = {
     text: string;
     active: string;
   };
-  reset: boolean;
+  reset?: boolean;
   active?: boolean;
 };
 const LifeTracker = ({ color, reset, active }: LifeTrackerProps) => {

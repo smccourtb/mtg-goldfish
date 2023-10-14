@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React from "react";
 import { useMachine } from "@xstate/react";
-import { createMachine } from "xstate";
+import { assign, createMachine, send } from "xstate";
 import Card from "./Card";
 import Button from "./Button";
 import LifeTracker from "./LifeTracker";
 import { useOpponent } from "../hooks/useOpponent";
+import { OpponentCreature } from "../types";
 
 type GameProps = {};
 
@@ -18,63 +19,321 @@ const priorityName = {
   [PlayersTurn.Opponent]: "Opponent",
 };
 
-const GameMachine = createMachine({
+export type GameMachineContext = {
+  opponent: {
+    creatures: OpponentCreature[];
+    availableMana: number;
+    manaPool: number;
+    handSize: number;
+    life: number;
+    library: number;
+    graveyard: number;
+  };
+  message: string;
+  turn: number;
+  priority: PlayersTurn;
+};
+
+export const gameMachine = createMachine({
   id: "game",
-  initial: "upkeep",
+  initial: "player",
+  context: {
+    opponent: {
+      creatures: [],
+      availableMana: 0,
+      manaPool: 0,
+      handSize: 7,
+      life: 40,
+      library: 60,
+      graveyard: 0,
+    },
+    message: "",
+    turn: 1,
+    priority: PlayersTurn.Player,
+  },
   states: {
     player: {
-      on: { PASS: "opponent" },
+      on: {
+        PASS: "opponent",
+        "creature.destroy": {
+          actions: assign({
+            opponent: (
+              context: GameMachineContext,
+
+              event: { type: string; value: OpponentCreature[] }
+            ) => {
+              const { value } = event;
+              return {
+                ...context.opponent,
+                creatures: value,
+              };
+            },
+          }),
+        },
+        "response.cast": {
+          actions: assign({
+            opponent: (
+              context: GameMachineContext,
+              event: {
+                type: string;
+                value: {
+                  opponent: GameMachineContext["opponent"];
+                  message: string;
+                };
+              }
+            ) => {
+              const { value } = event;
+              return {
+                ...context.opponent,
+                availableMana: value.opponent.availableMana,
+              };
+            },
+            message: (context, event) => {
+              const { value } = event;
+              return value.message;
+            },
+          }),
+        },
+        "response.attack": {
+          actions: assign({
+            opponent: (
+              context: GameMachineContext,
+              event: {
+                type: string;
+                value: {
+                  opponent: GameMachineContext["opponent"];
+                  message: string;
+                };
+              }
+            ) => {
+              const { value } = event;
+              return {
+                ...context.opponent,
+                creatures: value.opponent.creatures,
+              };
+            },
+            message: (context, event) => {
+              const { value } = event;
+              return value.message;
+            },
+          }),
+        },
+        "creature.update": {
+          actions: assign({
+            opponent: (
+              context: GameMachineContext,
+              event: { type: string; value: OpponentCreature[] }
+            ) => {
+              const { value } = event;
+              return {
+                ...context.opponent,
+                creatures: value,
+              };
+            },
+          }),
+        },
+      },
+      entry: [
+        assign({
+          priority: () => PlayersTurn.Player,
+        }),
+      ],
     },
     opponent: {
-      on: { PASS: "player" },
+      on: {
+        PASS: "player",
+        "creature.update": {
+          actions: assign({
+            opponent: (
+              context: GameMachineContext,
+              event: { type: string; value: OpponentCreature[] }
+            ) => {
+              const { value } = event;
+              return {
+                ...context.opponent,
+                creatures: value,
+              };
+            },
+          }),
+        },
+
+        "creature.destroy": {
+          actions: assign({
+            opponent: (
+              context: GameMachineContext,
+              event: { type: string; value: OpponentCreature[] }
+            ) => {
+              const { value } = event;
+              return {
+                ...context.opponent,
+                creatures: value,
+              };
+            },
+          }),
+        },
+      },
+      initial: "upkeep",
+      states: {
+        upkeep: {
+          on: { DONE_UPKEEP: "playSpell" },
+          after: {
+            5000: {
+              target: "playSpell",
+            },
+          },
+          entry: [
+            assign({
+              priority: () => PlayersTurn.Opponent,
+            }),
+          ],
+          invoke: {
+            src: "performUpkeep",
+            onDone: {
+              actions: [
+                assign({
+                  opponent: (context, data) => {
+                    const { opponent } = data.data;
+                    return opponent;
+                  },
+                  message: (context, data) => {
+                    const { message } = data.data;
+                    return message;
+                  },
+                }),
+              ],
+            },
+          },
+        },
+        playSpell: {
+          on: { DONE_MAIN: "combat" },
+          after: {
+            5000: {
+              target: "combat",
+            },
+          },
+          invoke: {
+            src: "castSpell",
+            onDone: {
+              actions: [
+                assign({
+                  message: (context, data) => {
+                    const { message } = data.data;
+                    return message;
+                  },
+                  opponent: (context, data) => {
+                    const { opponent } = data.data;
+                    return opponent;
+                  },
+                }),
+              ],
+            },
+          },
+        },
+        combat: {
+          on: { DONE_COMBAT: "end" },
+          after: {
+            5000: {
+              target: "end",
+            },
+          },
+          invoke: {
+            src: "performCombat",
+            onDone: {
+              actions: [
+                assign({
+                  message: (context, data) => {
+                    const { message } = data.data;
+                    return message;
+                  },
+                  opponent: (context, data) => {
+                    const { opponent } = data.data;
+                    return opponent;
+                  },
+                }),
+              ],
+            },
+          },
+        },
+        end: {
+          entry: [
+            assign({
+              turn: (context) => context.turn + 1,
+              priority: (context) =>
+                context.priority === PlayersTurn.Player
+                  ? PlayersTurn.Opponent
+                  : PlayersTurn.Player,
+              opponent: (context) => ({
+                ...context.opponent,
+                handSize: Math.min(context.opponent.handSize, 7),
+                availableMana: context.opponent.manaPool,
+              }),
+            }),
+            send("PASS"),
+          ],
+        },
+      },
     },
   },
 });
 
 const Game = ({}: GameProps) => {
-  const [turns, setTurns] = useState<{ count: number; priority: 0 | 1 }>({
-    priority: 0,
-    count: 1,
-  });
-  const [message, setMessage] = useState<string>("");
   const {
-    respondToSpell,
-    respondToAttack,
-    playSpell,
-    castSpell,
-    performTurn,
-    creatures,
-    resolveAction,
-    destroyCreature,
+    performUpkeep,
+    handlePlaySpell,
     tapCreature,
-    stats,
-    actions,
-  } = useOpponent(turns.count, turns.priority === PlayersTurn.Opponent);
-  const respondToAction = (action: () => string) => {};
+    destroyCreature,
+    attack,
+    responseToSpell,
+    responseToAttack,
+  } = useOpponent();
+  const [current, send] = useMachine(gameMachine, {
+    devTools: true,
+    services: {
+      performUpkeep: (ctx) => {
+        return new Promise((resolve) => {
+          const value = performUpkeep(ctx);
+          resolve(value);
+        });
+      },
+      castSpell: (ctx) => {
+        return new Promise((resolve) => {
+          const value = handlePlaySpell(ctx);
+          console.log("value", value);
 
-  const passTurn = () => {
-    setMessage("");
-    if (turns.priority === PlayersTurn.Player) {
-      setTurns((prev) => ({
-        ...prev,
-        priority: PlayersTurn.Opponent,
-      }));
-      performTurn();
-    } else {
-      setTurns((prev) => ({
-        ...prev,
-        priority: PlayersTurn.Player,
-        count: prev.count + 1,
-      }));
-    }
-  };
+          resolve(value);
+        });
+      },
+      performCombat: (ctx) => {
+        return new Promise((resolve) => {
+          const value = attack(ctx);
+          resolve(value);
+        });
+      },
+    },
+  });
 
   const playerActions = [
-    <Button key="cast" onClick={() => setMessage(respondToSpell())}>
+    <Button
+      key="cast"
+      onClick={() =>
+        send({
+          type: "response.cast",
+          value: responseToSpell(current.context),
+        })
+      }
+    >
       <span className="text-xs md:text-base">Cast spell</span>
     </Button>,
 
-    <Button key="attack" onClick={() => setMessage(respondToAttack())}>
+    <Button
+      key="attack"
+      onClick={() =>
+        send({
+          type: "response.attack",
+          value: responseToAttack(current.context),
+        })
+      }
+    >
       <span className="text-xs md:text-base">Attack</span>
     </Button>,
   ];
@@ -83,83 +342,100 @@ const Game = ({}: GameProps) => {
     <>
       <section className="h-1/3 flex">
         <LifeTracker
-            active={!!turns.priority}
-            color={{
-              background: "bg-blue-500",
-              active: "active:bg-blue-600",
-              text: "text-white",
-            }}
-            reset={turns.count === 1}
+          color={{
+            background: "bg-blue-500",
+            active: "active:bg-blue-600",
+            text: "text-white",
+          }}
         />
         <LifeTracker
-            active={!turns.priority}
-            color={{
-              background: "bg-red-500",
-              active: "active:bg-red-600",
-              text: "text-gray-900",
-            }}
-            reset={turns.count === 1}
+          color={{
+            background: "bg-red-500",
+            active: "active:bg-red-600",
+            text: "text-gray-900",
+          }}
         />
       </section>
       <section className="h-1/12 flex justify-evenly items-center p-2">
         <div className="text-xs md:text-base font-bold">
           <i className="ms ms-2x scale-75 mb-1.5 ms-tap-alt mr-1 font-bold" />
-          {turns.count}
+          {current.context.turn}
         </div>
         <span className="text-xs md:text-base font-bold ">
           <i className="ms ms-2x scale-75 mb-0.5 ms-ability-transform mr-1 font-bold" />
-          <span className="align-baseline">{stats.handSize}</span>
+          <span className="align-baseline">
+            {current.context.opponent.handSize}
+          </span>
         </span>
         <span className="text-xs md:text-base font-bold">
           <i className="ms ms-cost ms-c mr-1 ms-2x scale-75 mb-0.5" />
-          {stats.mana}
+          {current.context.opponent.availableMana}
         </span>
         <span className="text-xs md:text-base font-bold">
           <i className="ms ms-planeswalker mr-1 ms-2x mb-0.5" />
-          {priorityName[turns.priority as 0 | 1]}
+          {priorityName[current.context.priority]}
         </span>
       </section>
       <section className="bg-green-500 flex-col flex h-2/3 w-full">
         <h1 className="text-white font-bold text-sm md:text-xl m-2 flex h-14 min-h-14 max-h-14">
-          {message && (
+          {current.context.message && (
             <span className="border border-white rounded-md text-center flex items-center justify-center w-full">
-              {message}
+              {current.context.message}
             </span>
           )}
         </h1>
         <div className="mx-auto flex gap-4 py-4 h-full w-full flex-wrap items-center justify-center overflow-y-auto">
-          {creatures.map((creature, index) => (
+          {current.context.opponent.creatures.map((creature, index) => (
             <Card
-              creature={creature}
-              destroyCreature={destroyCreature}
-              tapCreature={tapCreature}
-              id={index}
               key={index}
+              creature={creature}
+              tapCreature={() =>
+                send({
+                  type: "creature.update",
+                  value: tapCreature(current.context.opponent.creatures, index),
+                })
+              }
+              destroyCreature={() =>
+                send({
+                  type: "creature.update",
+                  value: destroyCreature(
+                    current.context.opponent.creatures,
+                    index
+                  ),
+                })
+              }
             />
           ))}
         </div>
       </section>
       <section className="flex flex-1 h-1/6 bg-gray-700">
+        <Button
+          onClick={() => {
+            send("PASS");
+          }}
+        >
+          PASS
+        </Button>
         <div className="mt-auto self-end justify-end flex w-full flex-wrap p-4 gap-4">
-          {turns.priority === PlayersTurn.Player ? (
+          {current.context.priority === PlayersTurn.Player ? (
             [
               ...playerActions.map((action) => action),
-              <Button key="pass" onClick={passTurn}>
+              <Button
+                key="pass"
+                onClick={() => {
+                  send("DONE_UPKEEP");
+                }}
+              >
                 <span className="text-xs md:text-base">End Turn</span>
               </Button>,
             ]
           ) : (
             <Button
               onClick={() => {
-                const action = resolveAction();
-                if (action) {
-                  setMessage(action);
-                } else {
-                  passTurn();
-                }
+                send("DONE_UPKEEP");
               }}
             >
-              {actions.length > 0 ? (
+              {"" ? (
                 <span className="text-xs md:text-base">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"

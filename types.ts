@@ -13,4 +13,5 @@ export type OpponentCreature = {
   toughness: string;
   ability?: string;
   isTapped: boolean;
+  hasSummoningSickness: boolean;
 };

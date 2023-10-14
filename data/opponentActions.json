@@ -8,73 +8,73 @@
       "message": "Destroy all non-land permanents.",
       "cost": 3,
       "weight": 0.1,
-      "type": "sorcery"
+      "type": "spell"
     },
     {
       "message": "Destroy all creatures.",
       "cost": 4,
       "weight": 0.1,
-      "type": "sorcery"
+      "type": "spell"
     },
     {
       "message": "Destroy single best creature (you choose, honor system).",
       "cost": 2,
       "weight": 0.1,
-      "type": "instant"
+      "type": "spell"
     },
     {
       "message": "Destroy all artifacts.",
       "cost": 4,
       "weight": 0.1,
-      "type": "sorcery"
+      "type": "spell"
     },
     {
       "message": "Destroy single best artifact (you choose, honor system).",
       "cost": 1,
       "weight": 0.1,
-      "type": "instant"
+      "type": "spell"
     },
     {
       "message": "Destroy all enchantments.",
       "cost": 2,
       "weight": 0.1,
-      "type": "sorcery"
+      "type": "spell"
     },
     {
       "message": "Destroy single best enchantment (you choose, honor system).",
       "cost": 1,
       "weight": 0.1,
-      "type": "instant"
+      "type": "spell"
     },
     {
       "message": "Sacrifice highest power creature and take 2 damage.",
       "cost": 2,
       "weight": 0.1,
-      "type": "instant"
+      "type": "spell"
     },
     {
       "message": "Destroy all lands.",
       "cost": 4,
       "weight": 0.1,
-      "type": "sorcery"
+      "type": "spell"
     },
     {
       "message": "Destroy target land (you choose, honor system).",
       "cost": 1,
       "weight": 0.1,
-      "type": "sorcery"
+      "type": "spell"
     },
     {
       "message": "Recast each commander to command zone.",
       "cost": 3,
       "weight": 0.2,
-      "type": "instant"
+      "type": "spell"
     },
     {
       "message": "Exile all graveyards.",
       "cost": 3,
       "weight": 0.01,
-      "type": "sorcery"
+      "type": "spell"
     },
     {
       "message": "Cast */# creature.",
@@ -104,7 +104,7 @@
     "cast": [
       {
         "message": "Spell resolves.",
-        "cost": 1,
+        "cost": 0,
         "weight": 0.95
       },
       {

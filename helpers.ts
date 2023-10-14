@@ -1,4 +1,4 @@
-export const pickRandomIndex = (array: number[] | string[]) => {
+export const pickRandomIndex = (array: any[]) => {
   return array[Math.floor(Math.random() * array.length)];
 };
 

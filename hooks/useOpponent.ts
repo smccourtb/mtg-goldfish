@@ -1,36 +1,9 @@
 import possibleActions from "../data/opponentActions.json";
 import { Action, OpponentCreature } from "../types";
-import { useCallback, useEffect, useState } from "react";
 import { keywordAbilities, pickRandomIndex } from "../helpers";
-import { useMachine } from "@xstate/react";
-import { createMachine } from "xstate";
+import { GameMachineContext } from "../components/Game";
 
-enum Phase {
-  Upkeep,
-  Play,
-  Attack,
-  End,
-}
-
-const firstPhase = Phase.Upkeep;
-
-export const useOpponent = (turn: number, hasPriority: boolean) => {
-  const [creatures, setCreatures] = useState<OpponentCreature[]>([]);
-  const [currentPhase, setCurrentPhase] = useState<number>(firstPhase);
-  const [manaSources, setManaSources] = useState(0);
-  const [stats, setStats] = useState({
-    handSize: 7,
-    life: 40,
-    mana: 0,
-  });
-  const [actions, setActions] = useState<Action[]>([]);
-
-  // useEffect(() => {
-  //   if (hasPriority && currentPhase === Phase.Play) {
-  //     resolveAction();
-  //   }
-  // }, [hasPriority, currentPhase]);
-
+export const useOpponent = () => {
   function weightedObjectRandomPick(actions: Action[], mana: number): Action {
     console.log("beginning weight pick");
     if (actions.length === 0) {
@@ -71,265 +44,39 @@ export const useOpponent = (turn: number, hasPriority: boolean) => {
     return eligibleActions[eligibleActions.length - 1];
   }
 
-  const respondToSpell = () => {
-    const response = weightedObjectRandomPick(
-      possibleActions.responses.cast,
-      stats.mana
-    );
-    return response.message;
-  };
-
-  const respondToAttack = () => {
-    const response = weightedObjectRandomPick(
-      possibleActions.responses.attack,
-      stats.mana
-    );
-    return response.message;
-  };
-
-  const resolveAction = () => {
-    if (actions.length > 0) {
-      const currentAction = actions.shift();
-      if (currentAction) {
-        if (currentAction.type === "attack") {
-          tapCreature(currentAction.creatureIndex!);
-        }
-        if (currentAction.creature) {
-          setCreatures((prev) => [...prev, currentAction.creature!]);
-        }
-
-        setStats((prev) => {
-          return {
-            ...prev,
-            handSize: prev.handSize - 1,
-            mana:
-              currentAction.type === "attack"
-                ? prev.mana
-                : Math.max(0, prev.mana - currentAction.cost ?? 0),
-          };
-        });
-        return currentAction.message;
-      }
-    }
-    return null;
-  };
-  const castSpell = (spell: Action) => {
-    const { creature } = processAction(spell);
-    if (creature) {
-      setCreatures((prev) => [...prev, creature]);
-    }
-    setStats((prev) => {
-      return {
-        ...prev,
-        handSize: prev.handSize - 1,
-        mana: prev.mana - spell.cost ?? 0,
-      };
-    });
-
-    setActions((prev) => {
-      return {
-        ...prev,
-        spells: prev.filter((s) => s !== spell),
-      };
-    });
-  };
-
-  /**
-   * @description Chooses a spell from the available actions based on the current mana.
-   * @param mana
-   * @returns string
-   */
-  const playSpell = (mana: number) => {
-    const action = weightedObjectRandomPick(possibleActions.actions, mana);
-    if (!action.message) {
-      return "";
-    }
-    const spell = processAction(action);
-    if (spell?.creature) {
-      setCreatures((prev) => [...prev, spell.creature!]);
-    }
-    setStats((prev) => {
-      return {
-        ...prev,
-        handSize: prev.handSize - 1,
-        mana: prev.mana - spell?.cost ?? 0,
-      };
-    });
-    return spell.message;
-  };
-
   /**
    * @description Determines how much mana is added to mana pool.
    * @returns number
    */
-  const determineManaDraw = useCallback(() => {
-    if (stats.handSize > 0) {
+  const checkManaGain = (librarySize: number) => {
+    if (librarySize > 0) {
       // random chance to add mana
       const random = Math.random();
       if (random < 0.6) {
-        return stats.mana + 1;
-      } else if (random < 0.9) {
-        return stats.mana + 2;
-      } else if (random < 0.99) {
-        return stats.mana + 3;
+        return 1;
       }
-    }
-    return stats.mana;
-  }, [stats]);
-
-  /**
-   * @description Performs upkeep at the beginning of the turn. Untaps all creatures, draws a card, and determines if
-   *     any mana is added to mana pool.
-   * @returns void
-   */
-  const performUpkeep = useCallback(() => {
-    untapAllCreatures();
-    let handSize = stats.handSize + 1;
-    const mana = determineManaDraw();
-    setManaSources((prev) => prev + mana);
-
-    setStats((prev) => {
-      return { ...prev, handSize, mana };
-    });
-    return mana + manaSources;
-  }, [determineManaDraw, stats]);
-
-  const chooseAttackingCreatures = useCallback(() => {
-    const availableCreatures = creatures.filter(
-      (creature) => !creature.isTapped
-    );
-    let attackingActions: Action[] = [];
-    while (availableCreatures.length > 0) {
-      const random = Math.random();
-      if (random < 0.6) {
-        const index = Math.floor(Math.random() * availableCreatures.length);
-        attackingActions.push({
-          message: `Opponent attacks with ${availableCreatures[index].power}/${
-            availableCreatures[index].toughness
-          } ${availableCreatures?.[index]?.ability ?? ""} creature.`,
-          cost: 0,
-          weight: 0,
-          type: "attack",
-          creatureIndex: index,
-        });
-        availableCreatures.pop();
-      } else {
-        break;
-      }
-    }
-    return attackingActions;
-  }, [creatures]);
-
-  const determineAttack = useCallback(() => {
-    // determine if attack is possible and if chance is met
-    const random = Math.random();
-    if (random < 0.6) {
-      const availableCreatures = creatures.filter(
-        (creature) => !creature.isTapped
-      );
-      if (availableCreatures.length > 0) {
-        const index = Math.floor(Math.random() * availableCreatures.length);
-        tapCreature(index);
-        return `Opponent attacks with ${availableCreatures[index].power}/${availableCreatures[index].toughness} ${availableCreatures[index].ability} creature.`;
-        // determine if creature is tapped
-      }
-    } else {
-      return 'Opponent says "No attacks.';
-    }
-  }, [creatures]);
-
-  const queueAvailableActions = useCallback((currentMana: number) => {
-    console.log("currentMana", currentMana);
-
-    console.log("beginning choosing actions");
-    // pick a spell to perform and store it, then determine chance to pick another one and so on until mana is depleted or chance is not met
-    const spells = [];
-    let mana = currentMana;
-    while (mana > 0 && stats.handSize > 0) {
-      console.log("mana is greater than 0");
-
-      // random chance to determine if another spell is played
-      const random = Math.random();
-      if (random < 0.8) {
-        console.log("random is less than 0.6");
-        const spell = weightedObjectRandomPick(possibleActions.actions, mana);
-        console.log("spell", spell);
-        spells.push(processAction(spell));
-        mana -= spell.cost;
-      } else {
-        console.log("chance of action not met");
-        break;
-      }
-    }
-    console.log("mana is not greater than 0");
-    return spells;
-  }, []);
-
-  const performTurn = useCallback(() => {
-    const mana = performUpkeep();
-    const spells: Action[] = queueAvailableActions(mana);
-    console.log("end choosing actions ", spells);
-    console.log("choosing attacking creatures");
-    const attacks = chooseAttackingCreatures();
-    setActions((prev) => [...prev, ...spells, ...attacks]);
-  }, [chooseAttackingCreatures, performUpkeep, queueAvailableActions]);
-
-  const destroyCreature = (index: number) => {
-    setCreatures((prev) => {
-      const newCreatures = [...prev];
-      newCreatures.splice(index, 1);
-      return newCreatures;
-    });
-  };
-
-  const processAction = (
-    spell: Action
-  ) => {
-    if (!spell || !spell.message.includes("*")) {
-      return spell;
-    }
-    try {
-      const { message } = spell;
-      let creature: OpponentCreature = {
-        power: "",
-        toughness: "",
-        isTapped: false,
-      };
-      let updatedMessage = message;
-      Object.entries(wildcards).forEach(([wildcard, action]) => {
-        if (message.includes(wildcard)) {
-          updatedMessage = action(creature, updatedMessage);
-        }
-      });
-      spell.message = updatedMessage;
-      if (spell.type === "creature") {
-        spell.creature = creature;
-        spell.cost = Number(creature.power);
-      }
-
-      return spell;
-    } catch (error) {
-      console.error(error);
-      return spell;
+      return 0;
     }
   };
 
-  const tapCreature = (index: number) => {
-    setCreatures((prev) => {
-      return prev.map((creature, i) => {
-        if (i === index) {
-          return { ...creature, isTapped: !creature.isTapped };
-        }
-        return creature;
-      });
+  const destroyCreature = (creatures: OpponentCreature[], index: number) => {
+    const newCreatures = [...creatures];
+    newCreatures.splice(index, 1);
+    return newCreatures;
+  };
+
+  const tapCreature = (creatures: OpponentCreature[], index: number) => {
+    return creatures.map((creature, i) => {
+      if (i === index) {
+        creature.isTapped = !creature.isTapped;
+      }
+      return creature;
     });
   };
 
-  const untapAllCreatures = () => {
-    setCreatures((prev) => {
-      return prev.map((creature) => {
-        return { ...creature, isTapped: false };
-      });
+  const untapAllCreatures = (creatures: OpponentCreature[]) => {
+    return creatures.map((creature) => {
+      return { ...creature, isTapped: false };
     });
   };
 
@@ -344,17 +91,10 @@ export const useOpponent = (turn: number, hasPriority: boolean) => {
   const handlePower = (
     creature: OpponentCreature,
     message: string,
-    range?: number[]
+    manaCost: number
   ) => {
-    if (!range) {
-      console.log("stats.mana", stats.mana);
-
-      range = Array.from(Array(Math.max(turn, stats.mana)), (_, i) => i + 1);
-      console.log("range", range);
-    }
+    const range = Array.from(Array(manaCost), (_, i) => i + 1);
     const value = pickRandomIndex(range);
-    console.log("value", value);
-
     creature.power = value.toString();
     return replaceWildcard("*", value, message);
   };
@@ -362,11 +102,9 @@ export const useOpponent = (turn: number, hasPriority: boolean) => {
   const handleToughness = (
     creature: OpponentCreature,
     message: string,
-    range?: number[]
+    manaCost: number
   ) => {
-    if (!range) {
-      range = Array.from(Array(Math.max(turn, stats.mana)), (_, i) => i + 1);
-    }
+    const range = Array.from(Array(manaCost), (_, i) => i + 1);
     const value = pickRandomIndex(range);
     creature.toughness = value.toString();
     return replaceWildcard("#", value, message);
@@ -387,17 +125,209 @@ export const useOpponent = (turn: number, hasPriority: boolean) => {
     "<>": handleKeywordAbility,
   };
 
+  const performUpkeep = (context: GameMachineContext) => {
+    const { opponent } = context;
+    // untap all creatures
+    const untappedCreatures = untapAllCreatures(opponent.creatures);
+    let newLibrary = opponent.library;
+    let manaPool = opponent.manaPool;
+    let availableMana = opponent.availableMana;
+    let handSize = opponent.handSize;
+    let message = "";
+    if (newLibrary > 0) {
+      newLibrary -= 1;
+      handSize += 1;
+      const drewMana = checkManaGain(opponent.library);
+      if (drewMana) {
+        handSize -= 1;
+        manaPool += drewMana;
+        availableMana += drewMana;
+        message = `Opponent drew a card ${
+          drewMana && `and gained ${drewMana} mana.`
+        }`;
+      } else {
+        message = "Opponent drew a card.";
+      }
+      return {
+        opponent: {
+          ...opponent,
+          library: newLibrary,
+          creatures: untappedCreatures,
+          manaPool,
+          availableMana,
+          handSize,
+        },
+        message,
+      };
+    }
+    return {
+      opponent,
+      message: "Opponent has no cards left in their library.",
+    };
+  };
+
+  const playSpell = (message: string) => {
+    return {
+      message,
+      creature: null,
+    };
+  };
+
+  const determineAction = (action: Action) => {
+    const { type, message } = action;
+    switch (type) {
+      case "creature":
+        return playCreature(message, action.cost);
+      case "spell":
+        return playSpell(message);
+      default:
+        return null;
+    }
+  };
+
+  const playCreature = (message: string, manaCost: number) => {
+    let formattedMessage = message;
+    let creature: OpponentCreature = {
+      power: "",
+      toughness: "",
+      ability: "",
+      isTapped: false,
+      hasSummoningSickness: true,
+    };
+    Object.entries(wildcards).forEach(([wildcard, handler]) => {
+      if (message.includes(wildcard)) {
+        formattedMessage = handler(creature, formattedMessage, manaCost);
+      }
+    });
+    return {
+      message: formattedMessage,
+      creature,
+    };
+  };
+
+  const handlePlaySpell = (context: GameMachineContext) => {
+    const { opponent } = context;
+    let handSize = opponent.handSize;
+    let message = "";
+    let creatures = opponent.creatures;
+    let availableMana = opponent.availableMana;
+    if (handSize > 0 && availableMana > 0) {
+      const action = weightedObjectRandomPick(
+        possibleActions.actions,
+        availableMana
+      );
+
+      const parsedAction = determineAction(action);
+      if (parsedAction) {
+        availableMana -= action.cost;
+        handSize -= 1;
+        if (parsedAction?.creature) {
+          creatures.push(parsedAction.creature);
+        }
+        message = parsedAction.message;
+      } else {
+        message = "No actions taken.";
+      }
+    } else {
+      message = "No actions taken.";
+    }
+
+    return {
+      message,
+      opponent: {
+        ...opponent,
+        handSize,
+        availableMana,
+        creatures,
+      },
+    };
+  };
+
+  const attack = (context: GameMachineContext) => {
+    const { opponent } = context;
+    const { creatures } = opponent;
+    const untappedCreatures = creatures.filter(
+      (creature) => !creature.isTapped
+    );
+    if (untappedCreatures.length === 0) {
+      return {
+        message: "Opponent has no untapped creatures to attack with.",
+        opponent,
+      };
+    } else {
+      const creatureIndex = Math.floor(
+        Math.random() * untappedCreatures.length
+      );
+      const creature = untappedCreatures[creatureIndex];
+      const newCreatures = tapCreature(creatures, creatureIndex);
+      return {
+        message: `Opponent attacks with a ${creature.power}/${
+          creature.toughness
+        } ${creature.ability && `with ${creature.ability}.`}`,
+        opponent: {
+          ...opponent,
+          creatures: newCreatures,
+        },
+      };
+    }
+  };
+
+  const responseToSpell = (context: GameMachineContext) => {
+    if (context.opponent.availableMana === 0) {
+      return {
+        message: "Opponent has no mana to respond.",
+        opponent: context.opponent,
+      };
+    }
+    const response = weightedObjectRandomPick(
+      possibleActions.responses.cast,
+      context.opponent.availableMana
+    );
+    return {
+      message: response.message,
+      opponent: {
+        ...context.opponent,
+        availableMana: context.opponent.availableMana - response.cost,
+      },
+    };
+  };
+
+  const responseToAttack = (context: GameMachineContext) => {
+    const { opponent } = context;
+    const { creatures } = opponent;
+    const untappedCreatures = creatures.filter(
+      (creature) => !creature.isTapped
+    );
+    if (untappedCreatures.length === 0) {
+      return {
+        message: "Opponent has no untapped creatures to block with.",
+        opponent,
+      };
+    } else {
+      const creatureIndex = Math.floor(
+        Math.random() * untappedCreatures.length
+      );
+      const creature = untappedCreatures[creatureIndex];
+      const newCreatures = tapCreature(creatures, creatureIndex);
+      return {
+        message: `Opponent blocks with a ${creature.power}/${
+          creature.toughness
+        } ${creature.ability && `with ${creature.ability}.`}`,
+        opponent: {
+          ...opponent,
+          creatures: newCreatures,
+        },
+      };
+    }
+  };
+
   return {
-    respondToSpell,
-    respondToAttack,
-    performTurn,
-    playSpell,
-    creatures,
-    destroyCreature,
+    performUpkeep,
+    handlePlaySpell,
     tapCreature,
-    stats,
-    castSpell,
-    resolveAction,
-    actions,
+    destroyCreature,
+    attack,
+    responseToSpell,
+    responseToAttack,
   };
 };
