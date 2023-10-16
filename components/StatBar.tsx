@@ -8,7 +8,7 @@ type StatBarProps = {
 };
 const StatBar = ({ stats, turn, priorityName }: StatBarProps) => {
   return (
-    <section className="h-1/12 flex justify-evenly items-center p-2">
+    <>
       <div className="text-xs md:text-base font-bold">
         <i className="ms ms-2x scale-75 mb-1.5 ms-tap-alt mr-1 font-bold" />
         {turn}
@@ -31,7 +31,7 @@ const StatBar = ({ stats, turn, priorityName }: StatBarProps) => {
         <i className="ms ms-planeswalker mr-1 ms-2x mb-0.5" />
         {priorityName}
       </span>
-    </section>
+    </>
   );
 };
 
