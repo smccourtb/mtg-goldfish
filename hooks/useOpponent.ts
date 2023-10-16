@@ -342,5 +342,6 @@ export const useOpponent = (
     permanents,
     stats,
     setPhase,
+    phase,
   };
 };

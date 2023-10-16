@@ -43,27 +43,35 @@ const Game = ({}: GameProps) => {
     permanents,
     stats,
     setPhase,
+    phase,
   } = useOpponent(priority === PlayersTurn.Opponent, updateMessage);
 
   useEffect(() => {
     setBattlefield(permanents.creatures);
   }, [permanents]);
 
-  // useEffect(() => {
-  //   if (priority === PlayersTurn.Opponent) {
-  //     setTimeout(() => {
-  //       setPriority(PlayersTurn.Player);
-  //     }, 2000);
-  //   }
-  // }, [priority]);
-
   const playerActions = [
-    <Button key="cast" onClick={() => responseToSpell()}>
-      <span className="text-xs md:text-base">Cast spell</span>
-    </Button>,
-
-    <Button key="attack" onClick={() => responseToAttack()}>
-      <span className="text-xs md:text-base">Attack</span>
+    <div key="playerActions" className="mr-auto flex items-center gap-6">
+      <Button key="cast" onClick={() => responseToSpell()}>
+        <i className="ms ms-ability-transform ms-2x" />
+      </Button>
+      <Button key="attack" onClick={() => responseToAttack()}>
+        <i className="ms ms-battle ms-2x" />
+      </Button>
+    </div>,
+    <Button
+      key="pass"
+      onClick={() => {
+        closeMessageModal();
+        setTurn((prev) => ({
+          ...prev,
+          player: PlayersTurn.Opponent,
+        }));
+        setPriority(PlayersTurn.Opponent);
+        setPhase(0);
+      }}
+    >
+      <i className="ms ms-tap ms-2x" />
     </Button>,
   ];
 
@@ -94,11 +102,13 @@ const Game = ({}: GameProps) => {
           }}
         />
       </section>
-      <StatBar
-        stats={stats}
-        priorityName={priorityName[turn.player]}
-        turn={turn.count}
-      />
+      <section className="h-1/12 flex justify-evenly items-center p-2">
+        <StatBar
+          stats={stats}
+          priorityName={priorityName[turn.player]}
+          turn={turn.count}
+        />
+      </section>
       <section
         className="relative bg-green-500 flex-col flex h-2/3 w-full"
         ref={battlefieldRef}
@@ -109,7 +119,7 @@ const Game = ({}: GameProps) => {
             <MessageModal message={message} close={closeMessageModal} />,
             battlefieldRef.current
           )}
-        <div className="mx-auto flex gap-4 py-4 h-full w-full flex-wrap items-center justify-center overflow-y-auto">
+        <div className="mx-auto flex gap-4 py-4 w-full flex-wrap items-center justify-center overflow-y-auto mb-16">
           {battlefield.map((creature, index) => (
             <Card
               key={index}
@@ -120,28 +130,16 @@ const Game = ({}: GameProps) => {
           ))}
         </div>
       </section>
-      <section className="flex flex-1 h-1/6 bg-gray-700">
-        <div className="mt-auto self-end justify-end flex w-full flex-wrap p-4 gap-4">
+      <section
+        className={`transition-all duration-300 ease-in-out fixed bottom-0 flex flex-1 bg-gray-700 text-white w-full`}
+      >
+        <div className="mt-auto self-end justify-end flex w-full flex-wrap px-4 py-2 gap-4">
           {turn.player === PlayersTurn.Player ? (
-            [
-              ...playerActions.map((action) => action),
-              <Button
-                key="pass"
-                onClick={() => {
-                  setTurn((prev) => ({
-                    count: prev.count + 1,
-                    player: PlayersTurn.Opponent,
-                  }));
-                  setPriority(PlayersTurn.Opponent);
-                  setPhase(0);
-                }}
-              >
-                <span className="text-xs md:text-base">End Turn</span>
-              </Button>,
-            ]
-          ) : (
+            playerActions.map((action) => action)
+          ) : phase === 3 ? (
             <Button
               onClick={() => {
+                closeMessageModal();
                 setTurn((prev) => ({
                   count: prev.count + 1,
                   player: PlayersTurn.Player,
@@ -149,27 +147,10 @@ const Game = ({}: GameProps) => {
                 setPriority(PlayersTurn.Player);
               }}
             >
-              {"" ? (
-                <span className="text-xs md:text-base">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={1.5}
-                    stroke="currentColor"
-                    className="w-4 h-4 md:w-6 md:h-6"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75"
-                    />
-                  </svg>
-                </span>
-              ) : (
-                <span className="text-xs md:text-base">End Turn</span>
-              )}
+              <i className="ms ms-tap ms-2x" />
             </Button>
+          ) : (
+            <span className="h-[38px]" />
           )}
         </div>
       </section>
