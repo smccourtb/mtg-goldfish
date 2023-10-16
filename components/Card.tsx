@@ -10,7 +10,7 @@ const Card = ({ creature, destroyCreature, tapCreature }: CardProps) => {
   return (
     <div
       className={`${
-        creature.isTapped ? "rotate-90 opacity-70" : "rotate-0"
+        creature.isTapped ? "rotate-90 scale-75" : "rotate-0"
       } transition-all duration-200 ease-in-out flex flex-col border-2 border-white rounded-sm p-1 w-[75px] h-[100px] sm:w-[100px] sm:h-[150px] justify-between text-xs sm:text-base shadow-xl`}
       onClick={tapCreature}
     >
