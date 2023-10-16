@@ -1,11 +1,11 @@
-import React from "react";
-import { useMachine } from "@xstate/react";
-import { assign, createMachine, send } from "xstate";
+import React, { useEffect, useState } from "react";
 import Card from "./Card";
 import Button from "./Button";
 import LifeTracker from "./LifeTracker";
 import { useOpponent } from "../hooks/useOpponent";
 import { OpponentCreature } from "../types";
+import { createPortal } from "react-dom";
+import StatBar from "./StatBar";
 
 type GameProps = {};
 
@@ -19,324 +19,60 @@ const priorityName = {
   [PlayersTurn.Opponent]: "Opponent",
 };
 
-export type GameMachineContext = {
-  opponent: {
-    creatures: OpponentCreature[];
-    availableMana: number;
-    manaPool: number;
-    handSize: number;
-    life: number;
-    library: number;
-    graveyard: number;
-  };
-  message: string;
-  turn: number;
-  priority: PlayersTurn;
-};
-
-export const gameMachine = createMachine({
-  id: "game",
-  initial: "player",
-  context: {
-    opponent: {
-      creatures: [],
-      availableMana: 0,
-      manaPool: 0,
-      handSize: 7,
-      life: 40,
-      library: 60,
-      graveyard: 0,
-    },
-    message: "",
-    turn: 1,
-    priority: PlayersTurn.Player,
-  },
-  states: {
-    player: {
-      on: {
-        PASS: "opponent",
-        "creature.destroy": {
-          actions: assign({
-            opponent: (
-              context: GameMachineContext,
-
-              event: { type: string; value: OpponentCreature[] }
-            ) => {
-              const { value } = event;
-              return {
-                ...context.opponent,
-                creatures: value,
-              };
-            },
-          }),
-        },
-        "response.cast": {
-          actions: assign({
-            opponent: (
-              context: GameMachineContext,
-              event: {
-                type: string;
-                value: {
-                  opponent: GameMachineContext["opponent"];
-                  message: string;
-                };
-              }
-            ) => {
-              const { value } = event;
-              return {
-                ...context.opponent,
-                availableMana: value.opponent.availableMana,
-              };
-            },
-            message: (context, event) => {
-              const { value } = event;
-              return value.message;
-            },
-          }),
-        },
-        "response.attack": {
-          actions: assign({
-            opponent: (
-              context: GameMachineContext,
-              event: {
-                type: string;
-                value: {
-                  opponent: GameMachineContext["opponent"];
-                  message: string;
-                };
-              }
-            ) => {
-              const { value } = event;
-              return {
-                ...context.opponent,
-                creatures: value.opponent.creatures,
-              };
-            },
-            message: (context, event) => {
-              const { value } = event;
-              return value.message;
-            },
-          }),
-        },
-        "creature.update": {
-          actions: assign({
-            opponent: (
-              context: GameMachineContext,
-              event: { type: string; value: OpponentCreature[] }
-            ) => {
-              const { value } = event;
-              return {
-                ...context.opponent,
-                creatures: value,
-              };
-            },
-          }),
-        },
-      },
-      entry: [
-        assign({
-          priority: () => PlayersTurn.Player,
-        }),
-      ],
-    },
-    opponent: {
-      on: {
-        PASS: "player",
-        "creature.update": {
-          actions: assign({
-            opponent: (
-              context: GameMachineContext,
-              event: { type: string; value: OpponentCreature[] }
-            ) => {
-              const { value } = event;
-              return {
-                ...context.opponent,
-                creatures: value,
-              };
-            },
-          }),
-        },
-
-        "creature.destroy": {
-          actions: assign({
-            opponent: (
-              context: GameMachineContext,
-              event: { type: string; value: OpponentCreature[] }
-            ) => {
-              const { value } = event;
-              return {
-                ...context.opponent,
-                creatures: value,
-              };
-            },
-          }),
-        },
-      },
-      initial: "upkeep",
-      states: {
-        upkeep: {
-          on: { DONE_UPKEEP: "playSpell" },
-          after: {
-            5000: {
-              target: "playSpell",
-            },
-          },
-          entry: [
-            assign({
-              priority: () => PlayersTurn.Opponent,
-            }),
-          ],
-          invoke: {
-            src: "performUpkeep",
-            onDone: {
-              actions: [
-                assign({
-                  opponent: (context, data) => {
-                    const { opponent } = data.data;
-                    return opponent;
-                  },
-                  message: (context, data) => {
-                    const { message } = data.data;
-                    return message;
-                  },
-                }),
-              ],
-            },
-          },
-        },
-        playSpell: {
-          on: { DONE_MAIN: "combat" },
-          after: {
-            5000: {
-              target: "combat",
-            },
-          },
-          invoke: {
-            src: "castSpell",
-            onDone: {
-              actions: [
-                assign({
-                  message: (context, data) => {
-                    const { message } = data.data;
-                    return message;
-                  },
-                  opponent: (context, data) => {
-                    const { opponent } = data.data;
-                    return opponent;
-                  },
-                }),
-              ],
-            },
-          },
-        },
-        combat: {
-          on: { DONE_COMBAT: "end" },
-          after: {
-            5000: {
-              target: "end",
-            },
-          },
-          invoke: {
-            src: "performCombat",
-            onDone: {
-              actions: [
-                assign({
-                  message: (context, data) => {
-                    const { message } = data.data;
-                    return message;
-                  },
-                  opponent: (context, data) => {
-                    const { opponent } = data.data;
-                    return opponent;
-                  },
-                }),
-              ],
-            },
-          },
-        },
-        end: {
-          entry: [
-            assign({
-              turn: (context) => context.turn + 1,
-              priority: (context) =>
-                context.priority === PlayersTurn.Player
-                  ? PlayersTurn.Opponent
-                  : PlayersTurn.Player,
-              opponent: (context) => ({
-                ...context.opponent,
-                handSize: Math.min(context.opponent.handSize, 7),
-                availableMana: context.opponent.manaPool,
-              }),
-            }),
-            send("PASS"),
-          ],
-        },
-      },
-    },
-  },
-});
-
 const Game = ({}: GameProps) => {
+  const battlefieldRef = React.useRef(null);
+  const [priority, setPriority] = useState(PlayersTurn.Player);
+  const [turn, setTurn] = useState({
+    player: PlayersTurn.Player,
+    count: 0,
+  });
+  const [message, setMessage] = useState({ message: "", autoClose: false });
+  const [battlefield, setBattlefield] = useState<OpponentCreature[]>([]);
+  const updateMessage = (message: string, autoClose: boolean) => {
+    setPriority((prev) =>
+      prev === PlayersTurn.Player ? PlayersTurn.Opponent : PlayersTurn.Player
+    );
+    setMessage({ message, autoClose });
+  };
+
   const {
-    performUpkeep,
-    handlePlaySpell,
     tapCreature,
     destroyCreature,
-    attack,
     responseToSpell,
     responseToAttack,
-  } = useOpponent();
-  const [current, send] = useMachine(gameMachine, {
-    devTools: true,
-    services: {
-      performUpkeep: (ctx) => {
-        return new Promise((resolve) => {
-          const value = performUpkeep(ctx);
-          resolve(value);
-        });
-      },
-      castSpell: (ctx) => {
-        return new Promise((resolve) => {
-          const value = handlePlaySpell(ctx);
-          console.log("value", value);
+    permanents,
+    stats,
+    setPhase,
+  } = useOpponent(priority === PlayersTurn.Opponent, updateMessage);
 
-          resolve(value);
-        });
-      },
-      performCombat: (ctx) => {
-        return new Promise((resolve) => {
-          const value = attack(ctx);
-          resolve(value);
-        });
-      },
-    },
-  });
+  useEffect(() => {
+    setBattlefield(permanents.creatures);
+  }, [permanents]);
+
+  // useEffect(() => {
+  //   if (priority === PlayersTurn.Opponent) {
+  //     setTimeout(() => {
+  //       setPriority(PlayersTurn.Player);
+  //     }, 2000);
+  //   }
+  // }, [priority]);
 
   const playerActions = [
-    <Button
-      key="cast"
-      onClick={() =>
-        send({
-          type: "response.cast",
-          value: responseToSpell(current.context),
-        })
-      }
-    >
+    <Button key="cast" onClick={() => responseToSpell()}>
       <span className="text-xs md:text-base">Cast spell</span>
     </Button>,
 
-    <Button
-      key="attack"
-      onClick={() =>
-        send({
-          type: "response.attack",
-          value: responseToAttack(current.context),
-        })
-      }
-    >
+    <Button key="attack" onClick={() => responseToAttack()}>
       <span className="text-xs md:text-base">Attack</span>
     </Button>,
   ];
+
+  const closeMessageModal = () => {
+    setMessage({ message: "", autoClose: false });
+    setPriority((prev) =>
+      prev === PlayersTurn.Player ? PlayersTurn.Opponent : PlayersTurn.Player
+    );
+  };
 
   return (
     <>
@@ -356,74 +92,50 @@ const Game = ({}: GameProps) => {
           }}
         />
       </section>
-      <section className="h-1/12 flex justify-evenly items-center p-2">
-        <div className="text-xs md:text-base font-bold">
-          <i className="ms ms-2x scale-75 mb-1.5 ms-tap-alt mr-1 font-bold" />
-          {current.context.turn}
-        </div>
-        <span className="text-xs md:text-base font-bold ">
-          <i className="ms ms-2x scale-75 mb-0.5 ms-ability-transform mr-1 font-bold" />
-          <span className="align-baseline">
-            {current.context.opponent.handSize}
-          </span>
-        </span>
-        <span className="text-xs md:text-base font-bold">
-          <i className="ms ms-cost ms-c mr-1 ms-2x scale-75 mb-0.5" />
-          {current.context.opponent.availableMana}
-        </span>
-        <span className="text-xs md:text-base font-bold">
-          <i className="ms ms-planeswalker mr-1 ms-2x mb-0.5" />
-          {priorityName[current.context.priority]}
-        </span>
-      </section>
-      <section className="bg-green-500 flex-col flex h-2/3 w-full">
-        <h1 className="text-white font-bold text-sm md:text-xl m-2 flex h-14 min-h-14 max-h-14">
-          {current.context.message && (
-            <span className="border border-white rounded-md text-center flex items-center justify-center w-full">
-              {current.context.message}
-            </span>
+      <StatBar
+        stats={stats}
+        priorityName={priorityName[turn.player]}
+        turn={turn.count}
+      />
+      <section
+        className="relative bg-green-500 flex-col flex h-2/3 w-full"
+        ref={battlefieldRef}
+      >
+        {message.message &&
+          battlefieldRef.current &&
+          createPortal(
+            <MessageModal
+              message={message.message}
+              close={closeMessageModal}
+              autoClose={message.autoClose}
+            />,
+            battlefieldRef.current
           )}
-        </h1>
         <div className="mx-auto flex gap-4 py-4 h-full w-full flex-wrap items-center justify-center overflow-y-auto">
-          {current.context.opponent.creatures.map((creature, index) => (
+          {battlefield.map((creature, index) => (
             <Card
               key={index}
               creature={creature}
-              tapCreature={() =>
-                send({
-                  type: "creature.update",
-                  value: tapCreature(current.context.opponent.creatures, index),
-                })
-              }
-              destroyCreature={() =>
-                send({
-                  type: "creature.update",
-                  value: destroyCreature(
-                    current.context.opponent.creatures,
-                    index
-                  ),
-                })
-              }
+              tapCreature={() => tapCreature(index)}
+              destroyCreature={() => destroyCreature(index)}
             />
           ))}
         </div>
       </section>
       <section className="flex flex-1 h-1/6 bg-gray-700">
-        <Button
-          onClick={() => {
-            send("PASS");
-          }}
-        >
-          PASS
-        </Button>
         <div className="mt-auto self-end justify-end flex w-full flex-wrap p-4 gap-4">
-          {current.context.priority === PlayersTurn.Player ? (
+          {turn.player === PlayersTurn.Player ? (
             [
               ...playerActions.map((action) => action),
               <Button
                 key="pass"
                 onClick={() => {
-                  send("DONE_UPKEEP");
+                  setTurn((prev) => ({
+                    count: prev.count + 1,
+                    player: PlayersTurn.Opponent,
+                  }));
+                  setPriority(PlayersTurn.Opponent);
+                  setPhase(0);
                 }}
               >
                 <span className="text-xs md:text-base">End Turn</span>
@@ -432,7 +144,11 @@ const Game = ({}: GameProps) => {
           ) : (
             <Button
               onClick={() => {
-                send("DONE_UPKEEP");
+                setTurn((prev) => ({
+                  count: prev.count + 1,
+                  player: PlayersTurn.Player,
+                }));
+                setPriority(PlayersTurn.Player);
               }}
             >
               {"" ? (
@@ -460,6 +176,55 @@ const Game = ({}: GameProps) => {
         </div>
       </section>
     </>
+  );
+};
+
+const MessageModal = ({
+  autoClose,
+  message,
+  close,
+}: {
+  message: string;
+  close: () => void;
+  autoClose?: boolean;
+}) => {
+  const [time, setTime] = useState(2000);
+  // start a countdown to close the modal
+  useEffect(() => {
+    if (autoClose) {
+      const timer = setTimeout(() => {
+        setTime((prev) => prev - 10);
+      }, 10);
+      return () => clearTimeout(timer);
+    }
+  }, [time]);
+
+  useEffect(() => {
+    if (time === 0) {
+      close();
+    }
+  }, [time]);
+  // normalize time to a percentage
+  const progress = (time / 2000) * 100;
+
+  const bar = (
+    <div className="fixed bottom-0 left-0 h-1 w-full bg-gray-300 rounded-md">
+      <div
+        className="h-full bg-green-900 rounded-md w-full"
+        style={{ width: `${progress}%` }}
+      />
+    </div>
+  );
+  return (
+    <div
+      onClick={close}
+      className="inset-0 flex justify-center items-center overflow-hidden"
+    >
+      <div className="absolute top-4 flex flex-col bg-white p-4 rounded-md text-black h-1/4 drop-shadow-xl w-4/5">
+        {message}
+        {autoClose && bar}
+      </div>
+    </div>
   );
 };
 

@@ -1,9 +1,33 @@
 import possibleActions from "../data/opponentActions.json";
-import { Action, OpponentCreature } from "../types";
+import {
+  Action,
+  OpponentCreature,
+  OpponentPermanents,
+  OpponentStats,
+} from "../types";
 import { keywordAbilities, pickRandomIndex } from "../helpers";
-import { GameMachineContext } from "../components/Game";
+import { useEffect, useState } from "react";
 
-export const useOpponent = () => {
+export const useOpponent = (
+  hasPriority: boolean,
+  updateMessage: (message: string, autoClose: boolean) => void
+) => {
+  const [phase, setPhase] = useState(0);
+  const [stats, setStats] = useState<OpponentStats>({
+    handSize: 7,
+    library: 60,
+    manaPool: 0,
+    availableMana: 0,
+    graveyard: 0,
+    life: 40,
+  });
+  const [permanents, setPermanents] = useState<OpponentPermanents>({
+    creatures: [],
+    lands: [],
+    artifacts: [],
+    enchantments: [],
+  });
+
   function weightedObjectRandomPick(actions: Action[], mana: number): Action {
     console.log("beginning weight pick");
     if (actions.length === 0) {
@@ -48,8 +72,8 @@ export const useOpponent = () => {
    * @description Determines how much mana is added to mana pool.
    * @returns number
    */
-  const checkManaGain = (librarySize: number) => {
-    if (librarySize > 0) {
+  const checkManaGain = () => {
+    if (stats.library > 0) {
       // random chance to add mana
       const random = Math.random();
       if (random < 0.6) {
@@ -59,25 +83,37 @@ export const useOpponent = () => {
     }
   };
 
-  const destroyCreature = (creatures: OpponentCreature[], index: number) => {
-    const newCreatures = [...creatures];
-    newCreatures.splice(index, 1);
-    return newCreatures;
+  const destroyCreature = (index: number) => {
+    setPermanents((prev) => ({
+      ...prev,
+      creatures: prev.creatures.filter((_, i) => i !== index),
+    }));
   };
 
-  const tapCreature = (creatures: OpponentCreature[], index: number) => {
-    return creatures.map((creature, i) => {
-      if (i === index) {
-        creature.isTapped = !creature.isTapped;
-      }
-      return creature;
-    });
+  const tapCreature = (index: number) => {
+    setPermanents((prev) => ({
+      ...prev,
+      creatures: prev.creatures.map((creature, i) => {
+        if (i === index) {
+          return {
+            ...creature,
+            isTapped: !creature.isTapped,
+          };
+        }
+        return creature;
+      }),
+    }));
   };
 
-  const untapAllCreatures = (creatures: OpponentCreature[]) => {
-    return creatures.map((creature) => {
-      return { ...creature, isTapped: false };
-    });
+  const untapAllCreatures = () => {
+    setPermanents((prev) => ({
+      ...prev,
+      creatures: prev.creatures.map((creature) => ({
+        ...creature,
+        isTapped: false,
+        hasSummoningSickness: false,
+      })),
+    }));
   };
 
   const replaceWildcard = (
@@ -125,52 +161,44 @@ export const useOpponent = () => {
     "<>": handleKeywordAbility,
   };
 
-  const performUpkeep = (context: GameMachineContext) => {
-    const { opponent } = context;
+  const performUpkeep = () => {
+    console.log("performing upkeep");
+
     // untap all creatures
-    const untappedCreatures = untapAllCreatures(opponent.creatures);
-    let newLibrary = opponent.library;
-    let manaPool = opponent.manaPool;
-    let availableMana = opponent.availableMana;
-    let handSize = opponent.handSize;
-    let message = "";
+    untapAllCreatures();
+    let newLibrary = stats.library;
+    let manaPool = stats.manaPool;
+    let availableMana = stats.availableMana;
+    let handSize = stats.handSize;
     if (newLibrary > 0) {
       newLibrary -= 1;
       handSize += 1;
-      const drewMana = checkManaGain(opponent.library);
+      const drewMana = checkManaGain();
       if (drewMana) {
         handSize -= 1;
         manaPool += drewMana;
         availableMana += drewMana;
-        message = `Opponent drew a card ${
-          drewMana && `and gained ${drewMana} mana.`
-        }`;
+        updateMessage(
+          `Opponent drew a card ${drewMana && `and gained ${drewMana} mana.`}`,
+          true
+        );
       } else {
-        message = "Opponent drew a card.";
+        updateMessage("Opponent drew a card.", true);
       }
-      return {
-        opponent: {
-          ...opponent,
-          library: newLibrary,
-          creatures: untappedCreatures,
-          manaPool,
-          availableMana,
-          handSize,
-        },
-        message,
-      };
+      setStats((prev) => ({
+        ...prev,
+        library: newLibrary,
+        manaPool,
+        availableMana,
+        handSize,
+      }));
+      return;
     }
-    return {
-      opponent,
-      message: "Opponent has no cards left in their library.",
-    };
+    updateMessage("Opponent has no cards left in their library.", true);
   };
 
   const playSpell = (message: string) => {
-    return {
-      message,
-      creature: null,
-    };
+    updateMessage(message, false);
   };
 
   const determineAction = (action: Action) => {
@@ -199,135 +227,108 @@ export const useOpponent = () => {
         formattedMessage = handler(creature, formattedMessage, manaCost);
       }
     });
-    return {
-      message: formattedMessage,
-      creature,
-    };
+    setPermanents((prev) => ({
+      ...prev,
+      creatures: [...prev.creatures, creature],
+    }));
+    setStats((prev) => ({
+      ...prev,
+      availableMana: prev.availableMana - manaCost,
+      handSize: prev.handSize - 1,
+    }));
+    updateMessage(formattedMessage, false);
   };
 
-  const handlePlaySpell = (context: GameMachineContext) => {
-    const { opponent } = context;
-    let handSize = opponent.handSize;
-    let message = "";
-    let creatures = opponent.creatures;
-    let availableMana = opponent.availableMana;
-    if (handSize > 0 && availableMana > 0) {
+  const handlePlaySpell = () => {
+    if (stats.handSize > 0 && stats.availableMana > 0) {
       const action = weightedObjectRandomPick(
         possibleActions.actions,
-        availableMana
+        stats.availableMana
       );
-
-      const parsedAction = determineAction(action);
-      if (parsedAction) {
-        availableMana -= action.cost;
-        handSize -= 1;
-        if (parsedAction?.creature) {
-          creatures.push(parsedAction.creature);
-        }
-        message = parsedAction.message;
-      } else {
-        message = "No actions taken.";
-      }
-    } else {
-      message = "No actions taken.";
+      determineAction(action);
     }
-
-    return {
-      message,
-      opponent: {
-        ...opponent,
-        handSize,
-        availableMana,
-        creatures,
-      },
-    };
   };
 
-  const attack = (context: GameMachineContext) => {
-    const { opponent } = context;
-    const { creatures } = opponent;
+  const attack = () => {
+    const { creatures } = permanents;
     const untappedCreatures = creatures.filter(
       (creature) => !creature.isTapped
     );
-    if (untappedCreatures.length === 0) {
-      return {
-        message: "Opponent has no untapped creatures to attack with.",
-        opponent,
-      };
-    } else {
+    if (untappedCreatures.length > 0) {
       const creatureIndex = Math.floor(
         Math.random() * untappedCreatures.length
       );
       const creature = untappedCreatures[creatureIndex];
-      const newCreatures = tapCreature(creatures, creatureIndex);
-      return {
-        message: `Opponent attacks with a ${creature.power}/${
-          creature.toughness
-        } ${creature.ability && `with ${creature.ability}.`}`,
-        opponent: {
-          ...opponent,
-          creatures: newCreatures,
-        },
-      };
+      tapCreature(creatureIndex);
+      updateMessage(
+        `Opponent attacks with a ${creature.power}/${creature.toughness} ${
+          creature.ability && `with ${creature.ability}.`
+        }`,
+        false
+      );
     }
   };
 
-  const responseToSpell = (context: GameMachineContext) => {
-    if (context.opponent.availableMana === 0) {
-      return {
-        message: "Opponent has no mana to respond.",
-        opponent: context.opponent,
-      };
+  const responseToSpell = () => {
+    if (stats.availableMana === 0) {
+      updateMessage("Opponent has no mana to respond.", true);
     }
     const response = weightedObjectRandomPick(
       possibleActions.responses.cast,
-      context.opponent.availableMana
+      stats.availableMana
     );
-    return {
-      message: response.message,
-      opponent: {
-        ...context.opponent,
-        availableMana: context.opponent.availableMana - response.cost,
-      },
-    };
+
+    setStats((prev) => ({
+      ...prev,
+      availableMana: prev.availableMana - response.cost,
+    }));
+    updateMessage(response.message, false);
   };
 
-  const responseToAttack = (context: GameMachineContext) => {
-    const { opponent } = context;
-    const { creatures } = opponent;
+  const responseToAttack = () => {
+    const { creatures } = permanents;
     const untappedCreatures = creatures.filter(
       (creature) => !creature.isTapped
     );
     if (untappedCreatures.length === 0) {
-      return {
-        message: "Opponent has no untapped creatures to block with.",
-        opponent,
-      };
+      updateMessage("Opponent has no untapped creatures to block with.", true);
     } else {
       const creatureIndex = Math.floor(
         Math.random() * untappedCreatures.length
       );
       const creature = untappedCreatures[creatureIndex];
-      const newCreatures = tapCreature(creatures, creatureIndex);
-      return {
-        message: `Opponent blocks with a ${creature.power}/${
-          creature.toughness
-        } ${creature.ability && `with ${creature.ability}.`}`,
-        opponent: {
-          ...opponent,
-          creatures: newCreatures,
-        },
-      };
+      tapCreature(creatureIndex);
+      updateMessage(
+        `Opponent blocks with a ${creature.power}/${creature.toughness} ${
+          creature.ability && `with ${creature.ability}.`
+        }`,
+        false
+      );
     }
   };
 
+  useEffect(() => {
+    if (hasPriority) {
+      if (phase === 0) {
+        performUpkeep();
+        setPhase(1);
+      } else if (phase === 1) {
+        handlePlaySpell();
+        setPhase(2);
+      } else if (phase === 2) {
+        attack();
+        setPhase(3);
+      }
+    }
+  }, [hasPriority, phase]);
+
   return {
-    performUpkeep,
-    handlePlaySpell,
     tapCreature,
     destroyCreature,
-    attack,
     responseToSpell,
     responseToAttack,
+    permanents,
+    stats,
+    setPhase,
   };
 };

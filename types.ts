@@ -15,3 +15,20 @@ export type OpponentCreature = {
   isTapped: boolean;
   hasSummoningSickness: boolean;
 };
+
+export type OpponentStats = {
+  handSize: number;
+  library: number;
+  manaPool: number;
+  availableMana: number;
+  graveyard: number;
+  life: number;
+};
+
+export type OpponentPermanents = {
+  creatures: OpponentCreature[];
+  lands?: OpponentCreature[];
+  artifacts?: OpponentCreature[];
+  enchantments?: OpponentCreature[];
+  planeswalkers?: OpponentCreature[];
+};
