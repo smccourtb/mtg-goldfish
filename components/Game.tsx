@@ -3,7 +3,7 @@ import Card from "./Card";
 import Button from "./Button";
 import LifeTracker from "./LifeTracker";
 import { useOpponent } from "../hooks/useOpponent";
-import { OpponentCreature } from "../types";
+import { EventMessage, OpponentCreature } from "../types";
 import { createPortal } from "react-dom";
 import StatBar from "./StatBar";
 
@@ -26,13 +26,13 @@ const Game = ({}: GameProps) => {
     player: PlayersTurn.Player,
     count: 0,
   });
-  const [message, setMessage] = useState({ message: "", autoClose: false });
+  const [message, setMessage] = useState<EventMessage>({
+    value: "",
+  });
   const [battlefield, setBattlefield] = useState<OpponentCreature[]>([]);
-  const updateMessage = (message: string, autoClose: boolean) => {
-    setPriority((prev) =>
-      prev === PlayersTurn.Player ? PlayersTurn.Opponent : PlayersTurn.Player
-    );
-    setMessage({ message, autoClose });
+  const updateMessage = (message: EventMessage) => {
+    setPriority(PlayersTurn.Player);
+    setMessage({ ...message });
   };
 
   const {
@@ -101,14 +101,10 @@ const Game = ({}: GameProps) => {
         className="relative bg-green-500 flex-col flex h-2/3 w-full"
         ref={battlefieldRef}
       >
-        {message.message &&
+        {message.value &&
           battlefieldRef.current &&
           createPortal(
-            <MessageModal
-              message={message.message}
-              close={closeMessageModal}
-              autoClose={message.autoClose}
-            />,
+            <MessageModal message={message} close={closeMessageModal} />,
             battlefieldRef.current
           )}
         <div className="mx-auto flex gap-4 py-4 h-full w-full flex-wrap items-center justify-center overflow-y-auto">
@@ -180,24 +176,22 @@ const Game = ({}: GameProps) => {
 };
 
 const MessageModal = ({
-  autoClose,
   message,
   close,
 }: {
-  message: string;
+  message: EventMessage;
   close: () => void;
-  autoClose?: boolean;
 }) => {
-  const [time, setTime] = useState(2000);
+  const [time, setTime] = useState(message?.duration ?? -1);
   // start a countdown to close the modal
   useEffect(() => {
-    if (autoClose) {
+    if (message?.duration) {
       const timer = setTimeout(() => {
         setTime((prev) => prev - 10);
       }, 10);
       return () => clearTimeout(timer);
     }
-  }, [time]);
+  }, [time, message]);
 
   useEffect(() => {
     if (time === 0) {
@@ -205,7 +199,7 @@ const MessageModal = ({
     }
   }, [time]);
   // normalize time to a percentage
-  const progress = (time / 2000) * 100;
+  const progress = (time / (message?.duration ?? 0)) * 100;
 
   const bar = (
     <div className="fixed bottom-0 left-0 h-1 w-full bg-gray-300 rounded-md">
@@ -218,11 +212,11 @@ const MessageModal = ({
   return (
     <div
       onClick={close}
-      className="inset-0 flex justify-center items-center overflow-hidden"
+      className="absolute z-50 backdrop-blur-[2px] inset-0 flex justify-center items-center overflow-hidden text-center text-xs md:text-base"
     >
-      <div className="absolute top-4 flex flex-col bg-white p-4 rounded-md text-black h-1/4 drop-shadow-xl w-4/5">
-        {message}
-        {autoClose && bar}
+      <div className="absolute top-4 flex flex-col bg-white p-4 rounded-md text-black drop-shadow-xl w-4/5">
+        {message.value}
+        {message?.duration && bar}
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import possibleActions from "../data/opponentActions.json";
 import {
   Action,
+  EventMessage,
   OpponentCreature,
   OpponentPermanents,
   OpponentStats,
@@ -10,7 +11,7 @@ import { useEffect, useState } from "react";
 
 export const useOpponent = (
   hasPriority: boolean,
-  updateMessage: (message: string, autoClose: boolean) => void
+  updateMessage: (message: EventMessage) => void
 ) => {
   const [phase, setPhase] = useState(0);
   const [stats, setStats] = useState<OpponentStats>({
@@ -178,12 +179,17 @@ export const useOpponent = (
         handSize -= 1;
         manaPool += drewMana;
         availableMana += drewMana;
-        updateMessage(
-          `Opponent drew a card ${drewMana && `and gained ${drewMana} mana.`}`,
-          true
-        );
+        updateMessage({
+          value: `Opponent drew a card ${
+            drewMana && `and gained ${drewMana} mana.`
+          }`,
+          duration: 1000,
+        });
       } else {
-        updateMessage("Opponent drew a card.", true);
+        updateMessage({
+          value: "Opponent drew a card.",
+          duration: 1000,
+        });
       }
       setStats((prev) => ({
         ...prev,
@@ -194,11 +200,13 @@ export const useOpponent = (
       }));
       return;
     }
-    updateMessage("Opponent has no cards left in their library.", true);
+    updateMessage({
+      value: "Opponent has no cards left in their library.",
+    });
   };
 
   const playSpell = (message: string) => {
-    updateMessage(message, false);
+    updateMessage({ value: message });
   };
 
   const determineAction = (action: Action) => {
@@ -236,7 +244,7 @@ export const useOpponent = (
       availableMana: prev.availableMana - manaCost,
       handSize: prev.handSize - 1,
     }));
-    updateMessage(formattedMessage, false);
+    updateMessage({ value: formattedMessage });
   };
 
   const handlePlaySpell = () => {
@@ -260,18 +268,20 @@ export const useOpponent = (
       );
       const creature = untappedCreatures[creatureIndex];
       tapCreature(creatureIndex);
-      updateMessage(
-        `Opponent attacks with a ${creature.power}/${creature.toughness} ${
-          creature.ability && `with ${creature.ability}.`
-        }`,
-        false
-      );
+      updateMessage({
+        value: `Opponent attacks with a ${creature.power}/${
+          creature.toughness
+        } ${creature.ability && `with ${creature.ability}.`}`,
+      });
     }
   };
 
   const responseToSpell = () => {
     if (stats.availableMana === 0) {
-      updateMessage("Opponent has no mana to respond.", true);
+      updateMessage({
+        value: "Opponent has no mana to respond.",
+        duration: 1000,
+      });
     }
     const response = weightedObjectRandomPick(
       possibleActions.responses.cast,
@@ -282,7 +292,7 @@ export const useOpponent = (
       ...prev,
       availableMana: prev.availableMana - response.cost,
     }));
-    updateMessage(response.message, false);
+    updateMessage({ value: response.message });
   };
 
   const responseToAttack = () => {
@@ -291,19 +301,21 @@ export const useOpponent = (
       (creature) => !creature.isTapped
     );
     if (untappedCreatures.length === 0) {
-      updateMessage("Opponent has no untapped creatures to block with.", true);
+      updateMessage({
+        value: "Opponent has no untapped creatures to block with.",
+        duration: 1000,
+      });
     } else {
       const creatureIndex = Math.floor(
         Math.random() * untappedCreatures.length
       );
       const creature = untappedCreatures[creatureIndex];
       tapCreature(creatureIndex);
-      updateMessage(
-        `Opponent blocks with a ${creature.power}/${creature.toughness} ${
-          creature.ability && `with ${creature.ability}.`
-        }`,
-        false
-      );
+      updateMessage({
+        value: `Opponent blocks with a ${creature.power}/${
+          creature.toughness
+        } ${creature.ability && `with ${creature.ability}.`}`,
+      });
     }
   };
 

@@ -8,6 +8,11 @@ export type Action = {
   creatureIndex?: number;
 };
 
+export type EventMessage = {
+  value: string;
+  duration?: number;
+};
+
 export type OpponentCreature = {
   power: string;
   toughness: string;
