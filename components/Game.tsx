@@ -24,7 +24,7 @@ const Game = ({}: GameProps) => {
   const [priority, setPriority] = useState(PlayersTurn.Player);
   const [turn, setTurn] = useState({
     player: PlayersTurn.Player,
-    count: 0,
+    count: 1,
   });
   const [message, setMessage] = useState<EventMessage>({
     value: "",
@@ -68,10 +68,12 @@ const Game = ({}: GameProps) => {
   ];
 
   const closeMessageModal = () => {
-    setMessage({ message: "", autoClose: false });
-    setPriority((prev) =>
-      prev === PlayersTurn.Player ? PlayersTurn.Opponent : PlayersTurn.Player
-    );
+    const playerTurnOneCompleted = turn.count > 1 || turn.player === 1;
+    setMessage({ value: "" });
+    playerTurnOneCompleted &&
+      setPriority((prev) =>
+        prev === PlayersTurn.Player ? PlayersTurn.Opponent : PlayersTurn.Player
+      );
   };
 
   return (
