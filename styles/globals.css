@@ -1,3 +1,5 @@
+@import "//cdn.jsdelivr.net/npm/mana-font@latest/css/mana.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

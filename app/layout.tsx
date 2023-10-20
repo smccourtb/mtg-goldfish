@@ -1,19 +1,19 @@
 import React from "react";
-import '../styles/globals.css';
+import "../styles/globals.css";
 
 export const metadata = {
-  title: 'Goldfish',
-  description: 'Test out your deck',
-}
+  title: "Goldfish",
+  description: "Test out your deck",
+};
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <html lang="en">
-      <body className='h-screen w-screen'>{children}</body>
+      <body className="h-screen w-screen">{children}</body>
     </html>
-  )
+  );
 }

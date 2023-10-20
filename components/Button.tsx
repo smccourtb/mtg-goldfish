@@ -4,10 +4,10 @@ type ButtonProps = {
   children: React.ReactNode;
   onClick: () => void;
 };
-const Button = ({ children, onClick }: ButtonProps) => {
+const Button = ({ children, onClick}: ButtonProps) => {
   return (
     <button
-      className="border border-white rounded-md px-2 py-1 active:bg-white active:bg-opacity-10 font-semibold text-white"
+      className="flex items-center whitespace-nowrap gap-2 border border-white rounded-md px-2 py-1 active:bg-white active:bg-opacity-10 font-semibold text-white"
       onClick={() => {
         onClick();
       }}
