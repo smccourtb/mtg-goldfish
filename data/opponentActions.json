@@ -1,8 +1,4 @@
 {
-  "default": {
-    "message": "No action.",
-    "cost": 0
-  },
   "actions": [
     {
       "message": "Destroy all non-land permanents.",
@@ -17,7 +13,7 @@
       "type": "spell"
     },
     {
-      "message": "Destroy single best creature (you choose, honor system).",
+      "message": "Destroy target creature.",
       "cost": 2,
       "weight": 0.1,
       "type": "spell"
@@ -29,7 +25,7 @@
       "type": "spell"
     },
     {
-      "message": "Destroy single best artifact (you choose, honor system).",
+      "message": "Destroy target artifact.",
       "cost": 1,
       "weight": 0.1,
       "type": "spell"
@@ -41,7 +37,7 @@
       "type": "spell"
     },
     {
-      "message": "Destroy single best enchantment (you choose, honor system).",
+      "message": "Destroy target enchantment.",
       "cost": 1,
       "weight": 0.1,
       "type": "spell"
@@ -59,7 +55,7 @@
       "type": "spell"
     },
     {
-      "message": "Destroy target land (you choose, honor system).",
+      "message": "Destroy target land.",
       "cost": 1,
       "weight": 0.1,
       "type": "spell"
@@ -77,11 +73,34 @@
       "type": "spell"
     },
     {
-      "message": "Cast */# creature.",
+      "message": "Cast */# creature",
         "cost": 1,
         "weight": 0.3,
         "type": "creature"
+    },
+    {
+      "message": "Deal * damage to target player.",
+        "cost": 1,
+        "weight": 0.1,
+        "type": "spell"
+    },{
+      "message": "Deal * damage to target player, and # to target creature.",
+        "cost": 1,
+        "weight": 0.1,
+        "type": "spell"
+    },
+    {
+      "message": "Draw a card.",
+      "cost": 1,
+      "weight": 0.1,
+      "type": "draw"
+    },{
+      "message": "Opponent sacrifices a creature, and draws 1 card.",
+      "cost": 1,
+      "weight": 0.1,
+      "type": "draw"
     }
+
   ],
   "responses": {
     "attack": [
@@ -92,12 +111,13 @@
       },
       {
         "message": "Creature is blocked.",
-        "cost": 1,
-        "weight": 0.3
+        "cost": 0,
+        "weight": 0.3,
+        "type": "block"
       },
       {
         "message": "No response.",
-        "cost": 1,
+        "cost": 0,
         "weight": 0.3
       }
     ],

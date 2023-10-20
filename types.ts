@@ -19,6 +19,7 @@ export type OpponentCreature = {
   ability?: string;
   isTapped: boolean;
   hasSummoningSickness: boolean;
+  hasBlocked: boolean;
 };
 
 export type OpponentStats = {

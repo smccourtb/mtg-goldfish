@@ -48,16 +48,24 @@ export const useOpponent = (
       };
     }
 
+    // Calculate the sum of weights
     const totalWeight = eligibleActions.reduce(
       (sum, action) => sum + action.weight,
       0
     );
-    const randomValue = Math.random() * totalWeight;
+
+    // Normalize the weights so that they sum up to 1
+    const normalizedActions = eligibleActions.map((action) => ({
+      ...action,
+      weight: action.weight / totalWeight,
+    }));
+
+    const randomValue = Math.random();
 
     let cumulativeWeight = 0;
-    for (const action of eligibleActions) {
+    for (const action of normalizedActions) {
       cumulativeWeight += action.weight;
-      if (randomValue < cumulativeWeight) {
+      if (randomValue <= cumulativeWeight) {
         return action;
       }
     }
@@ -113,8 +121,15 @@ export const useOpponent = (
         ...creature,
         isTapped: false,
         hasSummoningSickness: false,
+        hasBlocked: false,
       })),
     }));
+  };
+
+  const formatSpellMessage = (message: string, cost: number) => {
+    const range = Array.from(Array(cost), (_, i) => i + 1);
+    const value = pickRandomIndex(range);
+    return replaceWildcard("*", value.toString(), message);
   };
 
   const replaceWildcard = (
@@ -153,26 +168,20 @@ export const useOpponent = (
   ) => {
     const value = pickRandomIndex(keywordAbilities);
     creature.ability = value as string;
-    return replaceWildcard("<>", value, message);
+    return `${message} with ${value}`;
   };
 
   const wildcards = {
     "*": handlePower,
     "#": handleToughness,
-    "<>": handleKeywordAbility,
   };
 
   const performUpkeep = () => {
-    console.log("performing upkeep");
-
-    // untap all creatures
     untapAllCreatures();
-    let newLibrary = stats.library;
     let manaPool = stats.manaPool;
-    let availableMana = stats.availableMana;
+    let availableMana = manaPool;
     let handSize = stats.handSize;
-    if (newLibrary > 0) {
-      newLibrary -= 1;
+    if (stats.library > 0) {
       handSize += 1;
       const drewMana = checkManaGain();
       if (drewMana) {
@@ -193,7 +202,7 @@ export const useOpponent = (
       }
       setStats((prev) => ({
         ...prev,
-        library: newLibrary,
+        library: Math.max(prev.library - 1, 0),
         manaPool,
         availableMana,
         handSize,
@@ -205,17 +214,25 @@ export const useOpponent = (
     });
   };
 
-  const playSpell = (message: string) => {
+  const playSpell = (message: string, cost: number) => {
     updateMessage({ value: message });
+    setStats((prev) => ({
+      ...prev,
+      availableMana: prev.availableMana - cost,
+      handSize: prev.handSize - 1,
+    }));
   };
 
   const determineAction = (action: Action) => {
-    const { type, message } = action;
+    const { type, message, cost } = action;
     switch (type) {
       case "creature":
-        return playCreature(message, action.cost);
+        // choose a random number from stats.availableMana
+        const manaCost = Math.floor(Math.random() * stats.availableMana) || 1;
+
+        return playCreature(message, manaCost);
       case "spell":
-        return playSpell(message);
+        return playSpell(message, cost);
       default:
         return null;
     }
@@ -229,12 +246,22 @@ export const useOpponent = (
       ability: "",
       isTapped: false,
       hasSummoningSickness: true,
+      hasBlocked: false,
     };
     Object.entries(wildcards).forEach(([wildcard, handler]) => {
       if (message.includes(wildcard)) {
-        formattedMessage = handler(creature, formattedMessage, manaCost);
+        formattedMessage = handler(
+          creature,
+          formattedMessage,
+          stats.availableMana
+        );
       }
     });
+    // pick a chance to add an ability
+    const random = Math.random();
+    if (random < 0.5) {
+      formattedMessage = handleKeywordAbility(creature, formattedMessage);
+    }
     setPermanents((prev) => ({
       ...prev,
       creatures: [...prev.creatures, creature],
@@ -258,28 +285,53 @@ export const useOpponent = (
   };
 
   const attack = () => {
-    const { creatures } = permanents;
-    const untappedCreatures = creatures.filter(
-      (creature) => !creature.isTapped
-    );
-    if (untappedCreatures.length > 0) {
-      const creatureIndex = Math.floor(
-        Math.random() * untappedCreatures.length
+    const random = Math.random();
+    if (random < 0.7) {
+      const { creatures } = permanents;
+      const untappedCreatures = creatures.filter(
+        (creature) => !creature.isTapped && !creature.hasSummoningSickness
       );
-      const creature = untappedCreatures[creatureIndex];
-      tapCreature(creatureIndex);
+      if (untappedCreatures.length > 0) {
+        let message = "Opponent attacks with a ";
+        const creatureAmount =
+          Math.floor(Math.random() * untappedCreatures.length) + 1;
+        for (let i = 0; i < creatureAmount; i++) {
+          const creatureIndex = Math.floor(
+            Math.random() * untappedCreatures.length
+          );
+          const creature = untappedCreatures.splice(creatureIndex, 1)[0];
+
+          tapCreature(creatures.indexOf(creature));
+
+          message =
+            message +
+            `${i === 0 ? "" : "and a "}${creature.power}/${
+              creature.toughness
+            } ${creature.ability && `with ${creature.ability}`}${
+              i !== creatureAmount - 1 ? ", " : "."
+            }`;
+        }
+        updateMessage({
+          value: message,
+        });
+      } else {
+        updateMessage({
+          value: "Opponent cannot attack.",
+          duration: 1000,
+        });
+      }
+    } else {
       updateMessage({
-        value: `Opponent attacks with a ${creature.power}/${
-          creature.toughness
-        } ${creature.ability && `with ${creature.ability}.`}`,
+        value: "Opponent chooses not to attack.",
+        duration: 1000,
       });
     }
   };
 
   const responseToSpell = () => {
-    if (stats.availableMana === 0) {
+    if (stats.availableMana === 0 || stats.handSize === 0) {
       updateMessage({
-        value: "Opponent has no mana to respond.",
+        value: "No response.",
         duration: 1000,
       });
     }
@@ -287,36 +339,73 @@ export const useOpponent = (
       possibleActions.responses.cast,
       stats.availableMana
     );
-
     setStats((prev) => ({
       ...prev,
       availableMana: prev.availableMana - response.cost,
+      // TODO: make this more robust
+      handSize: !response.message.includes("resolves")
+        ? prev.handSize - 1
+        : prev.handSize,
     }));
-    updateMessage({ value: response.message });
+    if (response.cost) {
+      const message = formatSpellMessage(response.message, response.cost);
+      updateMessage({ value: message });
+    } else {
+      updateMessage({ value: response.message });
+    }
   };
 
   const responseToAttack = () => {
     const { creatures } = permanents;
-    const untappedCreatures = creatures.filter(
-      (creature) => !creature.isTapped
+    const response = weightedObjectRandomPick(
+      possibleActions.responses.attack,
+      stats.availableMana
     );
-    if (untappedCreatures.length === 0) {
+    if (response.cost) {
+      if (stats.availableMana < response.cost || stats.handSize === 0) {
+        responseToAttack();
+        return;
+      }
+      setStats((prev) => ({
+        ...prev,
+        availableMana: prev.availableMana - response.cost,
+        handSize: prev.handSize - 1,
+      }));
+    } else if (response?.type === "block") {
+      const untappedCreatures = creatures.filter(
+        (creature) => !creature.isTapped && !creature.hasBlocked
+      );
+      if (untappedCreatures.length === 0) {
+        updateMessage({
+          value: "No response.",
+          duration: 1000,
+        });
+      } else {
+        updateMessage({
+          value: `Opponent blocks. Click on the blocked icon to set which creature blocked.`,
+        });
+      }
+    } else {
       updateMessage({
-        value: "Opponent has no untapped creatures to block with.",
+        value: "No response.",
         duration: 1000,
       });
-    } else {
-      const creatureIndex = Math.floor(
-        Math.random() * untappedCreatures.length
-      );
-      const creature = untappedCreatures[creatureIndex];
-      tapCreature(creatureIndex);
-      updateMessage({
-        value: `Opponent blocks with a ${creature.power}/${
-          creature.toughness
-        } ${creature.ability && `with ${creature.ability}.`}`,
-      });
     }
+  };
+
+  const blockCreature = (index: number) => {
+    setPermanents((prev) => ({
+      ...prev,
+      creatures: prev.creatures.map((creature, i) => {
+        if (i === index) {
+          return {
+            ...creature,
+            hasBlocked: !creature.hasBlocked,
+          };
+        }
+        return creature;
+      }),
+    }));
   };
 
   useEffect(() => {
@@ -330,6 +419,10 @@ export const useOpponent = (
       } else if (phase === 2) {
         attack();
         setPhase(3);
+        setStats((prev) => ({
+          ...prev,
+          handSize: Math.min(prev.handSize, 7),
+        }));
       }
     }
   }, [hasPriority, phase]);
@@ -337,6 +430,7 @@ export const useOpponent = (
   return {
     tapCreature,
     destroyCreature,
+    blockCreature,
     responseToSpell,
     responseToAttack,
     permanents,

@@ -1,3 +1,4 @@
+"use client";
 import React, { useEffect, useState } from "react";
 import Card from "./Card";
 import Button from "./Button";
@@ -38,6 +39,7 @@ const Game = ({}: GameProps) => {
   const {
     tapCreature,
     destroyCreature,
+    blockCreature,
     responseToSpell,
     responseToAttack,
     permanents,
@@ -86,7 +88,7 @@ const Game = ({}: GameProps) => {
 
   return (
     <>
-      <section className="h-1/3 flex">
+      <section className="h-1/4 flex">
         <LifeTracker
           color={{
             background: "bg-blue-500",
@@ -126,6 +128,7 @@ const Game = ({}: GameProps) => {
               creature={creature}
               tapCreature={() => tapCreature(index)}
               destroyCreature={() => destroyCreature(index)}
+              blockCreature={() => blockCreature(index)}
             />
           ))}
         </div>
@@ -139,7 +142,6 @@ const Game = ({}: GameProps) => {
           ) : phase === 3 ? (
             <Button
               onClick={() => {
-                closeMessageModal();
                 setTurn((prev) => ({
                   count: prev.count + 1,
                   player: PlayersTurn.Player,
@@ -195,9 +197,11 @@ const MessageModal = ({
   return (
     <div
       onClick={close}
-      className="absolute z-50 backdrop-blur-[2px] inset-0 flex justify-center items-center overflow-hidden text-center text-xs md:text-base"
+      className="bg-black bg-opacity-20 absolute z-50 transition-all duration-300 ease-in-out inset-0 flex justify-center items-center overflow-hidden text-center text-xs md:text-base"
     >
-      <div className="absolute top-4 flex flex-col bg-white p-4 rounded-md text-black drop-shadow-xl w-4/5">
+      <div
+        className={`border-4 border-gray-700 animate-slide-in absolute bottom-3 flex flex-col bg-white p-4 rounded-md text-black drop-shadow-xl w-4/5`}
+      >
         {message.value}
         {message?.duration && bar}
       </div>
