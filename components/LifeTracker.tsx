@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { GameContext } from "../context/GameContext";
 
 type LifeTrackerProps = {
   color: {
@@ -10,7 +11,8 @@ type LifeTrackerProps = {
   active?: boolean;
 };
 const LifeTracker = ({ color, reset, active }: LifeTrackerProps) => {
-  const [life, setLife] = useState(40);
+  const { gameType } = React.useContext(GameContext);
+  const [life, setLife] = useState(gameType.startingLife);
 
   useEffect(() => {
     if (reset) setLife(40);

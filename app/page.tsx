@@ -1,27 +1,19 @@
 import Game from "../components/Game";
+import { createPortal } from "react-dom";
+import Menu from "../components/Menu";
+import { GameProvider } from "../context/GameContext";
+
 export default function Page() {
+  console.log("page");
   return (
-    <main className="flex flex-col h-screen w-screen bg-gray-700">
-      <header className="bg-gray-700 text-white h-1/12 flex justify-between items-center p-2">
-        <h1 className="text-base md:text-2xl font-bold">Goldfish</h1>
-        <button>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
-            stroke="currentColor"
-            className="w-6 h-6"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M3.75 5.25h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5"
-            />
-          </svg>
-        </button>
-      </header>
-      <Game />
+    <main id="app" className="flex flex-col h-screen w-screen bg-gray-700">
+      <GameProvider>
+        <header className="bg-gray-700 text-white h-1/12 flex justify-between items-center p-2">
+          <h1 className="text-base md:text-2xl font-bold">Goldfish</h1>
+          <Menu />
+        </header>
+        <Game />
+      </GameProvider>
     </main>
   );
 }

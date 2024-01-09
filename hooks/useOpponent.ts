@@ -1,27 +1,39 @@
 import possibleActions from "../data/opponentActions.json";
 import {
   Action,
+  CardType,
+  Creature,
+  Enchantment,
   EventMessage,
+  Instant,
+  Land,
   OpponentCreature,
   OpponentPermanents,
   OpponentStats,
 } from "../types";
 import { keywordAbilities, pickRandomIndex } from "../helpers";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { GameContext } from "../context/GameContext";
 
 export const useOpponent = (
   hasPriority: boolean,
-  updateMessage: (message: EventMessage) => void
+  phase: number,
+  updateMessage: (message: EventMessage) => void,
+  isActive: boolean
 ) => {
-  const [phase, setPhase] = useState(0);
+  console.log("opponent");
+
+  const { gameType } = React.useContext(GameContext);
+  const [active, setActive] = useState(isActive);
   const [stats, setStats] = useState<OpponentStats>({
-    handSize: 7,
-    library: 60,
+    hand: [],
+    library: [],
     manaPool: 0,
     availableMana: 0,
-    graveyard: 0,
-    life: 40,
+    graveyard: [],
+    life: gameType.startingLife,
   });
+
   const [permanents, setPermanents] = useState<OpponentPermanents>({
     creatures: [],
     lands: [],
@@ -82,7 +94,7 @@ export const useOpponent = (
    * @returns number
    */
   const checkManaGain = () => {
-    if (stats.library > 0) {
+    if (stats.library.length > 0) {
       // random chance to add mana
       const random = Math.random();
       if (random < 0.6) {
@@ -176,16 +188,101 @@ export const useOpponent = (
     "#": handleToughness,
   };
 
+  const drawCards = (amount: number, library: CardType[]) => {
+    return library.slice(0, amount);
+  };
+
+  const createCreatureCard = () => {
+    const cost = Math.floor(Math.random() * 10) + 1;
+    const power = Math.min(cost, Math.floor(Math.random() * 10) + 1);
+    const toughness = Math.min(Math.floor(Math.random() * 10) + 1);
+    const creature: Creature = {
+      power: power.toString(),
+      toughness: toughness.toString(),
+      effects: {},
+      keywords: [],
+      type: "creature",
+      cost: cost.toString(),
+    };
+    // pick a chance to add an ability
+    const random = Math.random();
+    if (random < 0.5) {
+      creature.keywords.push(pickRandomIndex(keywordAbilities));
+    }
+    return creature;
+  };
+
+  const createEnchantmentCard = () => {
+    const cost = Math.floor(Math.random() * 10) + 1;
+    const enchantment: Enchantment = {
+      subtype: "aura",
+      type: "enchantment",
+      cost: cost.toString(),
+      effect: {} as Action,
+    };
+    return enchantment;
+  };
+
+  const createSpellCard = () => {
+    const cost = Math.floor(Math.random() * 10) + 1;
+    const spell: Instant = {
+      type: "instant",
+      cost: cost.toString(),
+      effect: {} as Action,
+    };
+    return spell;
+  };
+
+  useEffect(() => {
+    performSetup();
+  }, []);
+  const createLibrary = (): CardType[] => {
+    // FUTURE: take mana cost/curve into account
+    const landCards = Array.from(
+      Array(Math.round(gameType.librarySize / 3)),
+      () => ({ cost: "0", type: "land", isTapped: false } as Land)
+    );
+    const creatureCards = Array.from(
+      Array(Math.round(gameType.librarySize / 3)),
+      () => createCreatureCard()
+    );
+    const enchantments = Array.from(
+      Array(Math.round(gameType.librarySize / 10)),
+      () => createEnchantmentCard()
+    );
+    const spells = Array.from(
+      Array(Math.round(gameType.librarySize / 4.16)),
+      () => createSpellCard()
+    );
+    // randomize the order of the cards
+    return [...landCards, ...creatureCards, ...enchantments, ...spells]
+      .map((a) => ({ sort: Math.random(), value: a }))
+      .sort((a, b) => a.sort - b.sort)
+      .map((a) => a.value);
+  };
+
+  const performSetup = () => {
+    const startingHandSize = 7;
+    const library = createLibrary();
+    const startingHand = drawCards(startingHandSize, library);
+    setStats((prev) => ({
+      ...prev,
+      library: library.slice(startingHandSize, library.length + 1),
+      hand: [...startingHand],
+    }));
+  };
+
   const performUpkeep = () => {
     untapAllCreatures();
     let manaPool = stats.manaPool;
     let availableMana = manaPool;
-    let handSize = stats.handSize;
-    if (stats.library > 0) {
-      handSize += 1;
+    let hand = stats.hand;
+    if (stats.library.length > 0) {
+      // drawCard();
+      // hand += 1;
       const drewMana = checkManaGain();
       if (drewMana) {
-        handSize -= 1;
+        // hand -= 1;
         manaPool += drewMana;
         availableMana += drewMana;
         updateMessage({
@@ -202,10 +299,10 @@ export const useOpponent = (
       }
       setStats((prev) => ({
         ...prev,
-        library: Math.max(prev.library - 1, 0),
+        library: prev.library.slice(1),
         manaPool,
         availableMana,
-        handSize,
+        hand,
       }));
       return;
     }
@@ -216,12 +313,15 @@ export const useOpponent = (
 
   const playSpell = (message: string, cost: number) => {
     updateMessage({ value: message });
-    setStats((prev) => ({
-      ...prev,
-      availableMana: prev.availableMana - cost,
-      handSize: prev.handSize - 1,
-    }));
+    // TODO: need to figure out which card was removed from hand
+    // setStats((prev) => ({
+    //   ...prev,
+    //   availableMana: prev.availableMana - cost,
+    //   hand: prev.hand - 1,
+    // }));
   };
+
+  console.log("phase", phase);
 
   const determineAction = (action: Action) => {
     const { type, message, cost } = action;
@@ -266,16 +366,17 @@ export const useOpponent = (
       ...prev,
       creatures: [...prev.creatures, creature],
     }));
-    setStats((prev) => ({
-      ...prev,
-      availableMana: prev.availableMana - manaCost,
-      handSize: prev.handSize - 1,
-    }));
+    // TODO: need to figure out which card was removed from hand
+    // setStats((prev) => ({
+    //   ...prev,
+    //   availableMana: prev.availableMana - manaCost,
+    //   hand: prev.hand - 1,
+    // }));
     updateMessage({ value: formattedMessage });
   };
 
   const handlePlaySpell = () => {
-    if (stats.handSize > 0 && stats.availableMana > 0) {
+    if (stats.hand.length > 0 && stats.availableMana > 0) {
       const action = weightedObjectRandomPick(
         possibleActions.actions,
         stats.availableMana
@@ -329,7 +430,7 @@ export const useOpponent = (
   };
 
   const responseToSpell = () => {
-    if (stats.availableMana === 0 || stats.handSize === 0) {
+    if (stats.availableMana === 0 || stats.hand.length === 0) {
       updateMessage({
         value: "No response.",
         duration: 1000,
@@ -339,14 +440,15 @@ export const useOpponent = (
       possibleActions.responses.cast,
       stats.availableMana
     );
-    setStats((prev) => ({
-      ...prev,
-      availableMana: prev.availableMana - response.cost,
-      // TODO: make this more robust
-      handSize: !response.message.includes("resolves")
-        ? prev.handSize - 1
-        : prev.handSize,
-    }));
+    // TODO: need to figure out which card was removed from hand
+    // setStats((prev) => ({
+    //   ...prev,
+    //   availableMana: prev.availableMana - response.cost,
+    //   // TODO: make this more robust
+    //   hand: !response.message.includes("resolves")
+    //     ? prev.hand - 1
+    //     : prev.hand,
+    // }));
     if (response.cost) {
       const message = formatSpellMessage(response.message, response.cost);
       updateMessage({ value: message });
@@ -362,15 +464,16 @@ export const useOpponent = (
       stats.availableMana
     );
     if (response.cost) {
-      if (stats.availableMana < response.cost || stats.handSize === 0) {
+      if (stats.availableMana < response.cost || stats.hand.length === 0) {
         responseToAttack();
         return;
       }
-      setStats((prev) => ({
-        ...prev,
-        availableMana: prev.availableMana - response.cost,
-        handSize: prev.handSize - 1,
-      }));
+      // TODO: need to figure out which card was removed from hand
+      // setStats((prev) => ({
+      //   ...prev,
+      //   availableMana: prev.availableMana - response.cost,
+      //   hand: prev.hand - 1,
+      // }));
     } else if (response?.type === "block") {
       const untappedCreatures = creatures.filter(
         (creature) => !creature.isTapped && !creature.hasBlocked
@@ -408,24 +511,20 @@ export const useOpponent = (
     }));
   };
 
-  useEffect(() => {
-    if (hasPriority) {
-      if (phase === 0) {
-        performUpkeep();
-        setPhase(1);
-      } else if (phase === 1) {
-        handlePlaySpell();
-        setPhase(2);
-      } else if (phase === 2) {
-        attack();
-        setPhase(3);
-        setStats((prev) => ({
-          ...prev,
-          handSize: Math.min(prev.handSize, 7),
-        }));
-      }
+  if (hasPriority) {
+    if (phase === 0) {
+      performUpkeep();
+    } else if (phase === 1) {
+      handlePlaySpell();
+    } else if (phase === 2) {
+      attack();
+      // TODO: need to implement discard
+      // setStats((prev) => ({
+      //   ...prev,
+      //   hand: Math.min(prev.hand, 7),
+      // }));
     }
-  }, [hasPriority, phase]);
+  }
 
   return {
     tapCreature,
@@ -435,7 +534,5 @@ export const useOpponent = (
     responseToAttack,
     permanents,
     stats,
-    setPhase,
-    phase,
   };
 };

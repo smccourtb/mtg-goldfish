@@ -21,8 +21,10 @@ const priorityName = {
 };
 
 const Game = ({}: GameProps) => {
+  console.log("game");
   const battlefieldRef = React.useRef(null);
   const [priority, setPriority] = useState(PlayersTurn.Player);
+  const [phase, setPhase] = useState(0);
   const [turn, setTurn] = useState({
     player: PlayersTurn.Player,
     count: 1,
@@ -30,6 +32,7 @@ const Game = ({}: GameProps) => {
   const [message, setMessage] = useState<EventMessage>({
     value: "",
   });
+
   const [battlefield, setBattlefield] = useState<OpponentCreature[]>([]);
   const updateMessage = (message: EventMessage) => {
     setPriority(PlayersTurn.Player);
@@ -44,9 +47,12 @@ const Game = ({}: GameProps) => {
     responseToAttack,
     permanents,
     stats,
-    setPhase,
+  } = useOpponent(
+    priority === PlayersTurn.Opponent,
     phase,
-  } = useOpponent(priority === PlayersTurn.Opponent, updateMessage);
+    updateMessage,
+    turn.player === PlayersTurn.Opponent
+  );
 
   useEffect(() => {
     setBattlefield(permanents.creatures);
@@ -170,6 +176,9 @@ const MessageModal = ({
   const [time, setTime] = useState(message?.duration ?? -1);
   // start a countdown to close the modal
   useEffect(() => {
+    if (time === 0) {
+      close();
+    }
     if (message?.duration) {
       const timer = setTimeout(() => {
         setTime((prev) => prev - 10);
@@ -178,11 +187,6 @@ const MessageModal = ({
     }
   }, [time, message]);
 
-  useEffect(() => {
-    if (time === 0) {
-      close();
-    }
-  }, [time]);
   // normalize time to a percentage
   const progress = (time / (message?.duration ?? 0)) * 100;
 
