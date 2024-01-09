@@ -1,3 +1,4 @@
+"use client";
 import React, { useEffect, useState } from "react";
 
 type LifeTrackerProps = {
@@ -8,12 +9,18 @@ type LifeTrackerProps = {
   };
   reset?: boolean;
   active?: boolean;
+  startingLife?: number;
 };
-const LifeTracker = ({ color, reset, active }: LifeTrackerProps) => {
-  const [life, setLife] = useState(40);
+const LifeTracker = ({
+  color,
+  reset,
+  active,
+  startingLife,
+}: LifeTrackerProps) => {
+  const [life, setLife] = useState(startingLife ?? 40);
 
   useEffect(() => {
-    if (reset) setLife(40);
+    if (reset) setLife(startingLife ?? 40);
   }, [reset]);
 
   return (
